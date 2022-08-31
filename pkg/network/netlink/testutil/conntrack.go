@@ -31,7 +31,7 @@ func init() {
 // * 2.2.2.2 to 1.1.1.1 (OUTPUT Chain)
 // * 3.3.3.3 to 1.1.1.1 (PREROUTING Chain)
 func SetupDNAT(t *testing.T) {
-	linkName := "dummy" + strconv.Itoa(rand.Intn(98)+1)
+	linkName := "dummy" + strconv.Itoa(rand.Intn(9999)+1)
 	state := nettestutil.IptablesSave(t)
 	t.Cleanup(func() {
 		nettestutil.IptablesRestore(t, state)

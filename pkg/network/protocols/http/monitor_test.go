@@ -71,53 +71,63 @@ func TestHTTPMonitorCaptureRequestMultipleTimes(t *testing.T) {
 // TestHTTPMonitorLoadWithIncompleteBuffers sends thousands of requests without getting responses for them, in parallel
 // we send another request. We expect to capture the another request but not the incomplete requests.
 func TestHTTPMonitorLoadWithIncompleteBuffers(t *testing.T) {
-	monitor := newHTTPMonitor(t)
-
 	slowServerAddr := "localhost:8080"
 	fastServerAddr := "localhost:8081"
 
-	slowSrvDoneFn := testutil.HTTPServer(t, slowServerAddr, testutil.Options{
-		SlowResponse: time.Millisecond * 500, // Half a second.
-		WriteTimeout: time.Millisecond * 200,
-		ReadTimeout:  time.Millisecond * 200,
-	})
+	for _, TCPTimestamp := range []struct {
+		name  string
+		value bool
+	}{
+		{name: "without TCP timestamp option", value: false},
+		{name: "with TCP timestamp option", value: true},
+	} {
+		t.Run(TCPTimestamp.name, func(t *testing.T) {
+			monitor := newHTTPMonitor(t)
 
-	fastSrvDoneFn := testutil.HTTPServer(t, fastServerAddr, testutil.Options{})
+			slowSrvDoneFn := testutil.HTTPServer(t, slowServerAddr, testutil.Options{
+				SlowResponse:       time.Millisecond * 500, // Half a second.
+				WriteTimeout:       time.Millisecond * 200,
+				ReadTimeout:        time.Millisecond * 200,
+				EnableTCPTimestamp: TCPTimestamp.value,
+			})
 
-	abortedRequestFn := requestGenerator(t, fmt.Sprintf("%s/ignore", slowServerAddr), emptyBody)
-	wg := sync.WaitGroup{}
-	abortedRequests := make(chan *nethttp.Request, 100)
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			req := abortedRequestFn()
-			abortedRequests <- req
-		}()
+			fastSrvDoneFn := testutil.HTTPServer(t, fastServerAddr, testutil.Options{})
+			abortedRequestFn := requestGenerator(t, fmt.Sprintf("%s/ignore", slowServerAddr), emptyBody)
+			wg := sync.WaitGroup{}
+			abortedRequests := make(chan *nethttp.Request, 100)
+			for i := 0; i < 100; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					req := abortedRequestFn()
+					abortedRequests <- req
+				}()
+			}
+			fastReq := requestGenerator(t, fastServerAddr, emptyBody)()
+			wg.Wait()
+			close(abortedRequests)
+			slowSrvDoneFn()
+			fastSrvDoneFn()
+
+			foundFastReq := false
+			// We are iterating for a couple of iterations and making sure the aborted requests will never be found.
+			// Since the every call for monitor.GetHTTPStats will delete the pop all entries, and we want to find fastReq
+			// then we are using a variable to check if "we ever found it" among the iterations.
+			for i := 0; i < 10; i++ {
+				time.Sleep(10 * time.Millisecond)
+				stats := monitor.GetHTTPStats()
+				for req := range abortedRequests {
+					requestNotIncluded(t, stats, req)
+				}
+
+				included, err := isRequestIncludedOnce(stats, fastReq)
+				require.NoError(t, err)
+				foundFastReq = foundFastReq || included
+			}
+
+			require.True(t, foundFastReq)
+		})
 	}
-	fastReq := requestGenerator(t, fastServerAddr, emptyBody)()
-	wg.Wait()
-	close(abortedRequests)
-	slowSrvDoneFn()
-	fastSrvDoneFn()
-
-	foundFastReq := false
-	// We are iterating for a couple of iterations and making sure the aborted requests will never be found.
-	// Since the every call for monitor.GetHTTPStats will delete the pop all entries, and we want to find fastReq
-	// then we are using a variable to check if "we ever found it" among the iterations.
-	for i := 0; i < 10; i++ {
-		time.Sleep(10 * time.Millisecond)
-		stats := monitor.GetHTTPStats()
-		for req := range abortedRequests {
-			requestNotIncluded(t, stats, req)
-		}
-
-		included, err := isRequestIncludedOnce(stats, fastReq)
-		require.NoError(t, err)
-		foundFastReq = foundFastReq || included
-	}
-
-	require.True(t, foundFastReq)
 }
 
 func TestHTTPMonitorIntegrationWithResponseBody(t *testing.T) {
@@ -157,21 +167,33 @@ func TestHTTPMonitorIntegrationWithResponseBody(t *testing.T) {
 			requestBodySize: 10 * mb,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			monitor := newHTTPMonitor(t)
-			srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
-				EnableKeepAlives: true,
-			})
+	for _, TCPTimestamp := range []struct {
+		name  string
+		value bool
+	}{
+		{name: "without TCP timestamp option", value: false},
+		{name: "with TCP timestamp option", value: true},
+	} {
+		t.Run(TCPTimestamp.name, func(t *testing.T) {
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					monitor := newHTTPMonitor(t)
 
-			requestFn := requestGenerator(t, targetAddr, bytes.Repeat([]byte("a"), tt.requestBodySize))
-			var requests []*nethttp.Request
-			for i := 0; i < 100; i++ {
-				requests = append(requests, requestFn())
+					srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
+						EnableKeepAlives:   true,
+						EnableTCPTimestamp: TCPTimestamp.value,
+					})
+
+					requestFn := requestGenerator(t, targetAddr, bytes.Repeat([]byte("a"), tt.requestBodySize))
+					var requests []*nethttp.Request
+					for i := 0; i < 100; i++ {
+						requests = append(requests, requestFn())
+					}
+					srvDoneFn()
+
+					assertAllRequestsExists(t, monitor, requests)
+				})
 			}
-			srvDoneFn()
-
-			assertAllRequestsExists(t, monitor, requests)
 		})
 	}
 }
@@ -210,33 +232,44 @@ func TestHTTPMonitorIntegrationSlowResponse(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("DD_SYSTEM_PROBE_CONFIG_HTTP_MAP_CLEANER_INTERVAL_IN_S", strconv.Itoa(tt.mapCleanerIntervalSeconds))
-			t.Setenv("DD_SYSTEM_PROBE_CONFIG_HTTP_IDLE_CONNECTION_TTL_IN_S", strconv.Itoa(tt.httpIdleConnectionTTLSeconds))
-			monitor := newHTTPMonitor(t)
+		for _, TCPTimestamp := range []struct {
+			name  string
+			value bool
+		}{
+			{name: "without TCP timestamp option", value: false},
+			{name: "with TCP timestamp option", value: true},
+		} {
+			t.Run(TCPTimestamp.name, func(t *testing.T) {
+				t.Run(tt.name, func(t *testing.T) {
+					t.Setenv("DD_SYSTEM_PROBE_CONFIG_HTTP_MAP_CLEANER_INTERVAL_IN_S", strconv.Itoa(tt.mapCleanerIntervalSeconds))
+					t.Setenv("DD_SYSTEM_PROBE_CONFIG_HTTP_IDLE_CONNECTION_TTL_IN_S", strconv.Itoa(tt.httpIdleConnectionTTLSeconds))
+					slowResponseTimeout := time.Duration(tt.slowResponseTime) * time.Second
+					serverTimeout := slowResponseTimeout + time.Second
+					srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
+						WriteTimeout:       serverTimeout,
+						ReadTimeout:        serverTimeout,
+						SlowResponse:       slowResponseTimeout,
+						EnableTCPTimestamp: TCPTimestamp.value,
+					})
 
-			slowResponseTimeout := time.Duration(tt.slowResponseTime) * time.Second
-			serverTimeout := slowResponseTimeout + time.Second
-			srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
-				WriteTimeout: serverTimeout,
-				ReadTimeout:  serverTimeout,
-				SlowResponse: slowResponseTimeout,
+					monitor := newHTTPMonitor(t)
+
+					// Perform a number of random requests
+					req := requestGenerator(t, targetAddr, emptyBody)()
+					srvDoneFn()
+
+					// Ensure all captured transactions get sent to user-space
+					time.Sleep(10 * time.Millisecond)
+					stats := monitor.GetHTTPStats()
+
+					if tt.shouldCapture {
+						includesRequest(t, stats, req)
+					} else {
+						requestNotIncluded(t, stats, req)
+					}
+				})
 			})
-
-			// Perform a number of random requests
-			req := requestGenerator(t, targetAddr, emptyBody)()
-			srvDoneFn()
-
-			// Ensure all captured transactions get sent to user-space
-			time.Sleep(10 * time.Millisecond)
-			stats := monitor.GetHTTPStats()
-
-			if tt.shouldCapture {
-				includesRequest(t, stats, req)
-			} else {
-				requestNotIncluded(t, stats, req)
-			}
-		})
+		}
 	}
 }
 
@@ -244,16 +277,28 @@ func TestHTTPMonitorIntegration(t *testing.T) {
 	targetAddr := "localhost:8080"
 	serverAddr := "localhost:8080"
 
-	t.Run("with keep-alives", func(t *testing.T) {
-		testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
-			EnableKeepAlives: true,
+	for _, TCPTimestamp := range []struct {
+		name  string
+		value bool
+	}{
+		{name: "without TCP timestamp option", value: false},
+		{name: "with TCP timestamp option", value: true},
+	} {
+		t.Run(TCPTimestamp.name, func(t *testing.T) {
+			t.Run("with keep-alives", func(t *testing.T) {
+				testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
+					EnableKeepAlives:   true,
+					EnableTCPTimestamp: TCPTimestamp.value,
+				})
+			})
+			t.Run("without keep-alives", func(t *testing.T) {
+				testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
+					EnableKeepAlives:   false,
+					EnableTCPTimestamp: TCPTimestamp.value,
+				})
+			})
 		})
-	})
-	t.Run("without keep-alives", func(t *testing.T) {
-		testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
-			EnableKeepAlives: false,
-		})
-	})
+	}
 }
 
 func TestHTTPMonitorIntegrationWithNAT(t *testing.T) {
@@ -262,44 +307,82 @@ func TestHTTPMonitorIntegrationWithNAT(t *testing.T) {
 
 	targetAddr := "2.2.2.2:8080"
 	serverAddr := "1.1.1.1:8080"
-	t.Run("with keep-alives", func(t *testing.T) {
-		testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
-			EnableKeepAlives: true,
+
+	for _, TCPTimestamp := range []struct {
+		name  string
+		value bool
+	}{
+		{name: "without TCP timestamp option", value: false},
+		{name: "with TCP timestamp option", value: true},
+	} {
+		t.Run(TCPTimestamp.name, func(t *testing.T) {
+			t.Run("with keep-alives", func(t *testing.T) {
+				testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
+					EnableKeepAlives:   true,
+					EnableTCPTimestamp: TCPTimestamp.value,
+				})
+			})
+			t.Run("without keep-alives", func(t *testing.T) {
+				testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
+					EnableKeepAlives:   false,
+					EnableTCPTimestamp: TCPTimestamp.value,
+				})
+			})
 		})
-	})
-	t.Run("without keep-alives", func(t *testing.T) {
-		testHTTPMonitor(t, targetAddr, serverAddr, 100, testutil.Options{
-			EnableKeepAlives: false,
-		})
-	})
+	}
 }
 
 func TestUnknownMethodRegression(t *testing.T) {
-	monitor := newHTTPMonitor(t)
+	for _, TCPTimestamp := range []struct {
+		name  string
+		value bool
+	}{
+		{name: "without TCP timestamp option", value: false},
+		{name: "with TCP timestamp option", value: true},
+	} {
 
-	// SetupDNAT sets up a NAT translation from 2.2.2.2 to 1.1.1.1
-	netlink.SetupDNAT(t)
+		t.Run(TCPTimestamp.name, func(t *testing.T) {
+			targetAddr := "2.2.2.2:8080"
+			serverAddr := "1.1.1.1:8080"
+			srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
+				EnableTLS:          false,
+				EnableKeepAlives:   true,
+				EnableTCPTimestamp: TCPTimestamp.value,
+			})
+			defer srvDoneFn()
 
-	targetAddr := "2.2.2.2:8080"
-	serverAddr := "1.1.1.1:8080"
-	srvDoneFn := testutil.HTTPServer(t, serverAddr, testutil.Options{
-		EnableTLS:        false,
-		EnableKeepAlives: true,
-	})
-	defer srvDoneFn()
+			monitor := newHTTPMonitor(t)
+			// SetupDNAT sets up a NAT translation from 2.2.2.2 to 1.1.1.1
+			netlink.SetupDNAT(t)
 
-	requestFn := requestGenerator(t, targetAddr, emptyBody)
-	for i := 0; i < 100; i++ {
-		requestFn()
-	}
+			requestFn := requestGenerator(t, targetAddr, emptyBody)
+			for i := 0; i < 100; i++ {
+				requestFn()
+			}
 
-	time.Sleep(10 * time.Millisecond)
-	stats := monitor.GetHTTPStats()
+			time.Sleep(2 * time.Second)
+			stats := monitor.GetHTTPStats()
 
-	for key := range stats {
-		if key.Method == MethodUnknown {
-			t.Error("detected HTTP request with method unknown")
-		}
+			nonDstPortRequests := int64(0)
+			for key := range stats {
+				if key.DstPort != 8080 {
+					nonDstPortRequests++
+				}
+				if key.Method == MethodUnknown {
+					t.Error("detected HTTP request with method unknown")
+				}
+			}
+
+			telemetry := monitor.httpTelemetry
+			require.Equal(t, int64(0), telemetry.dropped.Get())
+			require.Equal(t, int64(0), telemetry.rejected.Get())
+			require.Equal(t, int64(0), telemetry.malformed.Get())
+			// requestGenerator() doesn't query 100 responses
+			require.Equal(t, int64(0), telemetry.hits1XX.Get())
+
+			requestsSum := telemetry.totalHits.Get()
+			require.Equal(t, int64(100), requestsSum-nonDstPortRequests)
+		})
 	}
 }
 
@@ -424,6 +507,7 @@ func allTrue(x []bool) bool {
 		}
 	}
 	return true
+
 }
 
 func testHTTPMonitor(t *testing.T, targetAddr, serverAddr string, numReqs int, o testutil.Options) {

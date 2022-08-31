@@ -566,6 +566,8 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
+require github.com/lorenzosaino/go-sysctl v0.3.1
+
 require (
 	github.com/godror/godror v0.37.0
 	github.com/jmoiron/sqlx v1.3.5
