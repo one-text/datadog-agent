@@ -7,9 +7,6 @@ package tests
 
 import (
 	"testing"
-
-	_ "github.com/DataDog/datadog-agent/pkg/compliance/resources/constants"
-	_ "github.com/DataDog/datadog-agent/pkg/compliance/resources/file"
 )
 
 func TestBase(t *testing.T) {
