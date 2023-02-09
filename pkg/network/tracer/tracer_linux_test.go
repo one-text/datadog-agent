@@ -34,6 +34,8 @@ import (
 	vnetns "github.com/vishvananda/netns"
 	"golang.org/x/sys/unix"
 
+	manager "github.com/DataDog/ebpf-manager"
+
 	ddconfig "github.com/DataDog/datadog-agent/pkg/config"
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode"
@@ -47,7 +49,6 @@ import (
 	tracertest "github.com/DataDog/datadog-agent/pkg/network/tracer/testutil"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
-	manager "github.com/DataDog/ebpf-manager"
 )
 
 var kv470 kernel.Version = kernel.VersionCode(4, 7, 0)
@@ -502,12 +503,12 @@ func TestTranslationBindingRegression(t *testing.T) {
 }
 
 func TestUnconnectedUDPSendIPv6(t *testing.T) {
-	if !kernel.IsIPv6Enabled() {
+	cfg := testConfig()
+	cfg.CollectIPv6Conns = true
+	if !isTestIPv6Enabled(cfg) {
 		t.Skip("IPv6 not enabled on host")
 	}
 
-	cfg := testConfig()
-	cfg.CollectIPv6Conns = true
 	tr := setupTracer(t, cfg)
 	linkLocal, err := offsetguess.GetIPv6LinkLocalAddress()
 	require.NoError(t, err)
@@ -1177,6 +1178,9 @@ func TestUDPReusePort(t *testing.T) {
 		testUDPReusePort(t, "udp4", "127.0.0.1")
 	})
 	t.Run("v6", func(t *testing.T) {
+		if !isTestIPv6Enabled(testConfig()) {
+			t.Skip("IPv6 disabled")
+		}
 		testUDPReusePort(t, "udp6", "[::1]")
 	})
 }
@@ -1415,6 +1419,10 @@ func TestSendfileRegression(t *testing.T) {
 
 	for _, family := range []network.ConnectionFamily{network.AFINET, network.AFINET6} {
 		t.Run(family.String(), func(t *testing.T) {
+			if family == network.AFINET6 && !isTestIPv6Enabled(cfg) {
+				t.Skip("IPv6 disabled")
+			}
+
 			t.Run("TCP", func(t *testing.T) {
 				// Start TCP server
 				var rcvd int64
@@ -1862,4 +1870,14 @@ func TestConntrackerFallback(t *testing.T) {
 		require.NotNil(t, conntracker)
 		conntracker.Close()
 	}
+}
+
+func isTestIPv6Enabled(cfg *config.Config) bool {
+	if kernel.IsIPv6Enabled() {
+		if !cfg.EnableRuntimeCompiler && !cfg.EnableCORE && kv >= kernel.VersionCode(5, 18, 0) {
+			return false
+		}
+		return true
+	}
+	return false
 }

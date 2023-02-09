@@ -20,13 +20,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 
+	manager "github.com/DataDog/ebpf-manager"
+
 	"github.com/DataDog/datadog-agent/pkg/ebpf/bytecode/runtime"
 	netebpf "github.com/DataDog/datadog-agent/pkg/network/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/connection/kprobe"
 	"github.com/DataDog/datadog-agent/pkg/network/tracer/offsetguess"
 	"github.com/DataDog/datadog-agent/pkg/process/statsd"
 	"github.com/DataDog/datadog-agent/pkg/util/kernel"
-	manager "github.com/DataDog/ebpf-manager"
 )
 
 //go:generate go run ../../../pkg/ebpf/include_headers.go ../../../pkg/network/ebpf/c/runtime/offsetguess-test.c ../../../pkg/ebpf/bytecode/build/runtime/offsetguess-test.c ../../../pkg/ebpf/c ../../../pkg/ebpf/c/protocols ../../../pkg/network/ebpf/c/runtime ../../../pkg/network/ebpf/c
@@ -275,7 +276,7 @@ func TestOffsetGuess(t *testing.T) {
 			if !kprobe.ClassificationSupported(cfg) {
 				continue
 			}
-		case offsetSaddrFl6, offsetDaddrFl6, offsetSportFl6, offsetDportFl6:
+		case offsetSaddrFl6, offsetDaddrFl6, offsetSportFl6, offsetDportFl6, offsetDaddrIpv6:
 			// TODO: offset guessing for these fields is currently broken on kernels 5.18+
 			// see https://datadoghq.atlassian.net/browse/NET-2984
 			if kv >= kernel.VersionCode(5, 18, 0) {

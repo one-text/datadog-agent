@@ -232,9 +232,14 @@ SEC("kprobe/ip6_make_skb")
 int kprobe__ip6_make_skb(struct pt_regs *ctx) {
     struct sock *sk = (struct sock *)PT_REGS_PARM1(ctx);
     size_t len = (size_t)PT_REGS_PARM4(ctx);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+    // commit: https://github.com/torvalds/linux/commit/f37a4cc6bb0ba08c2d9fd7d18a1da87161cbb7f9
+    struct inet_cork_full *cork_full = (struct inet_cork_full *)PT_REGS_PARM9(ctx);
+    struct flowi6 *fl6 = &cork_full->fl.u.ip6;
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)
     // commit: https://github.com/torvalds/linux/commit/26879da58711aa604a1b866cbeedd7e0f78f90ad
     // changed the arguments to ip6_make_skb and introduced the struct ipcm6_cookie
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)
     struct flowi6 *fl6 = (struct flowi6 *)PT_REGS_PARM7(ctx);
 #else
     struct flowi6 *fl6 = (struct flowi6 *)PT_REGS_PARM9(ctx);
@@ -310,7 +315,7 @@ int kretprobe__ip6_make_skb(struct pt_regs *ctx) {
         t.dport = bpf_ntohs(t.dport);
     }
 
-    log_debug("kprobe/ip6_make_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
+    log_debug("kretprobe/ip6_make_skb: pid_tgid: %d, size: %d\n", pid_tgid, size);
     handle_message(&t, size, 0, CONN_DIRECTION_UNKNOWN, 1, 0, PACKET_COUNT_INCREMENT, sk);
     increment_telemetry_count(udp_send_processed);
 
