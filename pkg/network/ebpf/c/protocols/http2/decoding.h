@@ -162,6 +162,7 @@ end:
     return true;
 }
 
+
 // This function reads the http2 headers frame.
 static __always_inline __u8 filter_relevant_headers(struct __sk_buff *skb, skb_info_t *skb_info, conn_tuple_t *tup, http2_ctx_t *http2_ctx, http2_header_t *headers_to_process, __u32 frame_length) {
     __u8 current_ch;
