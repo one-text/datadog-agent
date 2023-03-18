@@ -4,7 +4,6 @@
 // Copyright 2016-present Datadog, Inc.
 
 //go:build linux_bpf
-// +build linux_bpf
 
 //go:generate go run ../../../../ebpf/include_headers.go ../c/runtime/tcp-queue-length-kern.c ../../../../ebpf/bytecode/build/runtime/tcp-queue-length.c ../../../../ebpf/c
 //go:generate go run ../../../../ebpf/bytecode/runtime/integrity.go ../../../../ebpf/bytecode/build/runtime/tcp-queue-length.c ../../../../ebpf/bytecode/runtime/tcp-queue-length.go runtime
