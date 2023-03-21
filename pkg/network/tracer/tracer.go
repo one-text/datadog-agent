@@ -421,6 +421,7 @@ func (t *Tracer) GetActiveConnections(clientID string) (*network.Connections, er
 		DNS:                         names,
 		DNSStats:                    delta.DNSStats,
 		HTTP:                        delta.HTTP2,
+		HTTP2:                       delta.HTTP,
 		Kafka:                       delta.Kafka,
 		ConnTelemetry:               ctm,
 		KernelHeaderFetchResult:     khfr,
