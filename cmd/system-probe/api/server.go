@@ -17,6 +17,7 @@ import (
 	"github.com/DataDog/datadog-agent/cmd/system-probe/modules"
 	"github.com/DataDog/datadog-agent/cmd/system-probe/utils"
 	"github.com/DataDog/datadog-agent/pkg/process/net"
+	"github.com/DataDog/datadog-agent/pkg/util/filesystem"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
@@ -46,8 +47,15 @@ func StartServer(cfg *config.Config) error {
 
 	mux.Handle("/debug/vars", http.DefaultServeMux)
 
+	allowedUsrID, allowedGrpID, err := filesystem.UserDDAgent()
+	if err != nil {
+		// if user dd-agent doesn't exist, map to root
+		allowedUsrID = 0
+		allowedGrpID = 0
+	}
+
 	go func() {
-		err = http.Serve(conn.GetListener(), mux)
+		err := net.HttpServe(conn.GetListener(), mux, allowedUsrID, allowedGrpID)
 		if err != nil && err != http.ErrServerClosed {
 			log.Errorf("error creating HTTP server: %s", err)
 		}
