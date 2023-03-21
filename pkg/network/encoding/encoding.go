@@ -96,6 +96,13 @@ func modelConnections(conns *network.Connections) *model.Connections {
 		).Add(int64(httpEncoder.orphanEntries))
 	}
 
+	if http2Encoder != nil && http2Encoder.orphanEntries > 0 {
+		log.Debugf(
+			"detected orphan http2 aggregations. this can be either caused by conntrack sampling or missed tcp close events. count=%d",
+			http2Encoder.orphanEntries,
+		)
+	}
+
 	routes := make([]*model.Route, len(routeIndex))
 	for _, v := range routeIndex {
 		routes[v.Idx] = &v.Route

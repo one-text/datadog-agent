@@ -87,12 +87,12 @@ func FormatConnection(
 	dnsFormatter.FormatConnectionDNS(conn, c)
 	httpStats, staticTags, dynamicTags := httpEncoder.GetHTTPAggregationsAndTags(conn)
 	if httpStats != nil {
-		c.HttpAggregations, _ = proto.Marshal(httpStats)
+		c.Http2Aggregations, _ = proto.Marshal(httpStats)
 	}
 
 	httpStats2, _, _ := http2Encoder.GetHTTP2AggregationsAndTags(conn)
 	if httpStats2 != nil {
-		c.Http2Aggregations, _ = proto.Marshal(httpStats2)
+		c.HttpAggregations, _ = proto.Marshal(httpStats2)
 	}
 
 	kafkaStats := kafkaEncoder.GetKafkaAggregations(conn)
