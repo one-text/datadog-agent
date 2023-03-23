@@ -184,7 +184,7 @@ func TestHTTPSViaLibraryIntegration(t *testing.T) {
 		} {
 			t.Run(keepAlive.name, func(t *testing.T) {
 				// Spin-up HTTPS server
-				serverDoneFn := testutil.HTTPServer(t, "127.0.0.1:443", testutil.Options{
+				serverDoneFn := testutil.HTTPServer(t, "127.0.0.1:8443", testutil.Options{
 					EnableTLS:        true,
 					EnableKeepAlives: keepAlive.value,
 				})
@@ -275,14 +275,20 @@ func testHTTPSLibrary(t *testing.T, fetchCmd []string, prefetchLibs []string) {
 	// Issue request using fetchCmd (wget, curl, ...)
 	// This is necessary (as opposed to using net/http) because we want to
 	// test a HTTP client linked to OpenSSL or GnuTLS
-	const targetURL = "https://127.0.0.1:443/200/foobar"
+	const targetURL = "https://127.0.0.1:8443/200/foobar"
 	cmd := append(fetchCmd, targetURL)
 	requestCmd := exec.Command(cmd[0], cmd[1:]...)
 	out, err := requestCmd.CombinedOutput()
 	require.NoErrorf(t, err, "failed to issue request via %s: %s\n%s", fetchCmd, err, string(out))
+	fmt.Println("run", cmd[0], "with output of", string(out))
 
 	require.Eventuallyf(t, func() bool {
 		payload := getConnections(t, tr)
+		for _, c := range payload.Conns {
+			if c.SPort == 8443 || c.DPort == 8443 {
+				t.Log("a relevant connection", c, "has http?", len(payload.HTTP))
+			}
+		}
 		for key, stats := range payload.HTTP {
 			req, exists := stats.Data[200]
 			if !exists {
