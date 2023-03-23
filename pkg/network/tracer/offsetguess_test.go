@@ -276,7 +276,7 @@ func TestOffsetGuess(t *testing.T) {
 			if !kprobe.ClassificationSupported(cfg) {
 				continue
 			}
-		case offsetSaddrFl6, offsetDaddrFl6, offsetSportFl6, offsetDportFl6, offsetDaddrIpv6:
+		case offsetSaddrFl6, offsetDaddrFl6, offsetSportFl6, offsetDportFl6:
 			// TODO: offset guessing for these fields is currently broken on kernels 5.18+
 			// see https://datadoghq.atlassian.net/browse/NET-2984
 			if kv >= kernel.VersionCode(5, 18, 0) {

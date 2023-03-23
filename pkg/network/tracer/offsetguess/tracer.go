@@ -198,14 +198,16 @@ func (*tracerOffsetGuesser) Probes(c *config.Config) (map[probes.ProbeFuncName]s
 		return nil, err
 	}
 
-	if c.CollectIPv6Conns && kv < kernel.VersionCode(5, 18, 0) {
+	if c.CollectIPv6Conns {
 		enableProbe(p, probes.TCPv6Connect)
 		enableProbe(p, probes.TCPv6ConnectReturn)
 
-		if kv < kernel.VersionCode(4, 7, 0) {
-			enableProbe(p, probes.IP6MakeSkbPre470)
-		} else {
-			enableProbe(p, probes.IP6MakeSkb)
+		if kv < kernel.VersionCode(5, 18, 0) {
+			if kv < kernel.VersionCode(4, 7, 0) {
+				enableProbe(p, probes.IP6MakeSkbPre470)
+			} else {
+				enableProbe(p, probes.IP6MakeSkb)
+			}
 		}
 	}
 	return p, nil
@@ -587,10 +589,6 @@ func (t *tracerOffsetGuesser) Guess(cfg *config.Config) ([]manager.ConstantEdito
 	if err != nil {
 		return nil, err
 	}
-	guessIPv6 := cfg.CollectIPv6Conns && kv < kernel.VersionCode(5, 18, 0)
-	if !guessIPv6 {
-		t.status.Ipv6_enabled = disabled
-	}
 
 	// if we already have the offsets, just return
 	err = mp.Lookup(unsafe.Pointer(&zero), unsafe.Pointer(t.status))
@@ -598,7 +596,8 @@ func (t *tracerOffsetGuesser) Guess(cfg *config.Config) ([]manager.ConstantEdito
 		return t.getConstantEditors(), nil
 	}
 
-	eventGenerator, err := newTracerEventGenerator(guessIPv6)
+	guessFlowI6 := cfg.CollectIPv6Conns && kv < kernel.VersionCode(5, 18, 0)
+	eventGenerator, err := newTracerEventGenerator(guessFlowI6)
 	if err != nil {
 		return nil, err
 	}
@@ -690,7 +689,7 @@ type tracerEventGenerator struct {
 	udpDone  func()
 }
 
-func newTracerEventGenerator(ipv6 bool) (*tracerEventGenerator, error) {
+func newTracerEventGenerator(flowi6 bool) (*tracerEventGenerator, error) {
 	eg := &tracerEventGenerator{}
 
 	// port 0 means we let the kernel choose a free port
@@ -724,7 +723,7 @@ func newTracerEventGenerator(ipv6 bool) (*tracerEventGenerator, error) {
 		return nil, err
 	}
 
-	eg.udp6Conn, err = getUDP6Conn(ipv6)
+	eg.udp6Conn, err = getUDP6Conn(flowi6)
 	if err != nil {
 		eg.Close()
 		return nil, err
@@ -733,8 +732,8 @@ func newTracerEventGenerator(ipv6 bool) (*tracerEventGenerator, error) {
 	return eg, nil
 }
 
-func getUDP6Conn(ipv6 bool) (*net.UDPConn, error) {
-	if !ipv6 {
+func getUDP6Conn(flowi6 bool) (*net.UDPConn, error) {
+	if !flowi6 {
 		return nil, nil
 	}
 
