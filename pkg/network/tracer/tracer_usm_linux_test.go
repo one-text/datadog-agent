@@ -576,6 +576,7 @@ func createJavaTempFile(t *testing.T, dir string) string {
 	require.NoError(t, err)
 	tempfile.Close()
 	os.Remove(tempfile.Name())
+	t.Cleanup(func() { os.Remove(tempfile.Name()) })
 
 	return tempfile.Name()
 }
