@@ -146,7 +146,7 @@ func (r *soRegistration) Unregister() bool {
 	}
 	if r.unregisterCB != nil {
 		if err := r.unregisterCB(r.pathID); err != nil {
-			log.Debugf("error while unregisterin %s : %s", r.pathID.String(), err)
+			log.Debugf("error while unregistering %s : %s", r.pathID.String(), err)
 		}
 	}
 	return true
@@ -278,7 +278,7 @@ func (r *soRegistry) cleanup() {
 	}
 }
 
-// Unregister a pid if exist, unregisterCB will be called if his refcount == 0
+// Unregister a pid if exists, unregisterCB will be called if his refcount == 0
 func (r *soRegistry) Unregister(pid uint32) {
 	r.m.Lock()
 	defer r.m.Unlock()
@@ -295,7 +295,7 @@ func (r *soRegistry) Unregister(pid uint32) {
 }
 
 // Register a ELF library root/libPath as be used by the pid
-// Only one registration will be done per ELF (system wide)
+// Only one registration will be done per ELF (system-wide)
 func (r *soRegistry) Register(root string, libPath string, pid uint32, rule soRule) {
 	hostLibPath := root + libPath
 	pathID, err := newPathIdentifier(hostLibPath)
@@ -320,7 +320,7 @@ func (r *soRegistry) Register(root string, libPath string, pid uint32, rule soRu
 
 	if err := rule.registerCB(pathID, root, libPath); err != nil {
 		log.Debugf("error registering library (adding to blocklist) %s path %s by pid %d : %s", pathID.String(), hostLibPath, pid, err)
-		// we calling unregisterCB here as some uprobe could be already attached, unregisterCB will cleanup those entries
+		// we call unregisterCB here as some uprobe could be already attached, unregisterCB will clean up those entries
 		if rule.unregisterCB != nil {
 			if err := rule.unregisterCB(pathID); err != nil {
 				log.Debugf("unregisterCB library %s path %s : %s", pathID.String(), hostLibPath, err)

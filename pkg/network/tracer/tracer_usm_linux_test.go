@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -161,8 +162,8 @@ func TestHTTPSViaLibraryIntegration(t *testing.T) {
 	}
 
 	tlsLibs := []*regexp.Regexp{
-		regexp.MustCompile(`/[^\ ]+libssl.so[^\ ]*`),
-		regexp.MustCompile(`/[^\ ]+libgnutls.so[^\ ]*`),
+		regexp.MustCompile(`/[^ ]+libssl.so[^ ]*`),
+		regexp.MustCompile(`/[^ ]+libgnutls.so[^ ]*`),
 	}
 	tests := []struct {
 		name     string
@@ -172,50 +173,87 @@ func TestHTTPSViaLibraryIntegration(t *testing.T) {
 		{name: "curl", fetchCmd: []string{"curl", "--http1.1", "-k", "-o/dev/null"}},
 	}
 
-	for _, keepAlives := range []struct {
-		name  string
-		value bool
-	}{
-		{name: "without keep-alives", value: false},
-		{name: "with keep-alives", value: true},
-	} {
-		t.Run(keepAlives.name, func(t *testing.T) {
-			// Spin-up HTTPS server
-			serverDoneFn := testutil.HTTPServer(t, "127.0.0.1:443", testutil.Options{
-				EnableTLS:        true,
-				EnableKeepAlives: keepAlives.value,
-			})
-			t.Cleanup(serverDoneFn)
+	for i := 0; i < 10; i++ {
 
-			for _, test := range tests {
-				t.Run(test.name, func(t *testing.T) {
-					fetch, err := exec.LookPath(test.fetchCmd[0])
-					if err != nil {
-						t.Skipf("%s not found; skipping test.", test.fetchCmd)
-					}
-					ldd, err := exec.LookPath("ldd")
-					if err != nil {
-						t.Skip("ldd not found; skipping test.")
-					}
-					linked, _ := exec.Command(ldd, fetch).Output()
-
-					var prefechLibs []string
-					for _, lib := range tlsLibs {
-						libSSLPath := lib.FindString(string(linked))
-						if _, err := os.Stat(libSSLPath); err == nil {
-							prefechLibs = append(prefechLibs, libSSLPath)
-						}
-					}
-					if len(prefechLibs) == 0 {
-						t.Fatalf("%s not linked with any of these libs %v", test.name, tlsLibs)
-					}
-
-					testHTTPSLibrary(t, test.fetchCmd, prefechLibs)
-
+		for _, keepAlive := range []struct {
+			name  string
+			value bool
+		}{
+			{name: "without keep-alive", value: false},
+			{name: "with keep-alive", value: true},
+		} {
+			t.Run(keepAlive.name, func(t *testing.T) {
+				// Spin-up HTTPS server
+				serverDoneFn := testutil.HTTPServer(t, "127.0.0.1:443", testutil.Options{
+					EnableTLS:        true,
+					EnableKeepAlives: keepAlive.value,
 				})
-			}
-		})
+				t.Cleanup(serverDoneFn)
+
+				for _, test := range tests {
+					t.Run(test.name, func(t *testing.T) {
+						fetch, err := exec.LookPath(test.fetchCmd[0])
+						if err != nil {
+							t.Skipf("%s not found; skipping test.", test.fetchCmd)
+						}
+						ldd, err := exec.LookPath("ldd")
+						if err != nil {
+							t.Skip("ldd not found; skipping test.")
+						}
+						linked, _ := exec.Command(ldd, fetch).Output()
+
+						var prefetchLibs []string
+						for _, lib := range tlsLibs {
+							libSSLPath := lib.FindString(string(linked))
+							if _, err := os.Stat(libSSLPath); err == nil {
+								prefetchLibs = append(prefetchLibs, libSSLPath)
+							}
+						}
+						if len(prefetchLibs) == 0 {
+							t.Fatalf("%s not linked with any of these libs %v", test.name, tlsLibs)
+						}
+
+						testHTTPSLibrary(t, test.fetchCmd, prefetchLibs)
+					})
+				}
+			})
+		}
 	}
+}
+
+func setupTracerAndWaitForUSM(t *testing.T, cfg *config.Config) *Tracer {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	logCallbacks := make(chan string, 5)
+	t.Cleanup(func() {
+		cancel()
+		close(logCallbacks)
+	})
+
+	regex := regexp.MustCompile(`http monitoring enabled`)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case _, ok := <-logCallbacks:
+				if !ok {
+					return
+				}
+				return
+			case <-ctx.Done():
+				t.Errorf("failed to http monitoring wasn't enabled")
+				return
+			}
+		}
+	}()
+
+	require.NoError(t, tracertestutil.SetupLogScanner(ctx, regex, logCallbacks, "info"))
+
+	tr := setupTracer(t, cfg)
+	wg.Wait()
+	return tr
 }
 
 func testHTTPSLibrary(t *testing.T, fetchCmd []string, prefetchLibs []string) {
@@ -223,7 +261,8 @@ func testHTTPSLibrary(t *testing.T, fetchCmd []string, prefetchLibs []string) {
 	cfg := testConfig()
 	cfg.EnableHTTPMonitoring = true
 	cfg.EnableHTTPSMonitoring = true
-	tr := setupTracer(t, cfg)
+
+	tr := setupTracerAndWaitForUSM(t, cfg)
 
 	// not ideal but, short process are hard to catch
 	for _, lib := range prefetchLibs {
@@ -232,7 +271,6 @@ func testHTTPSLibrary(t *testing.T, fetchCmd []string, prefetchLibs []string) {
 			t.Cleanup(func() { f.Close() })
 		}
 	}
-	time.Sleep(time.Second)
 
 	// Issue request using fetchCmd (wget, curl, ...)
 	// This is necessary (as opposed to using net/http) because we want to
