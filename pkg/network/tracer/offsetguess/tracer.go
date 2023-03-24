@@ -198,10 +198,12 @@ func (*tracerOffsetGuesser) Probes(c *config.Config) (map[probes.ProbeFuncName]s
 		return nil, err
 	}
 
-	if c.CollectIPv6Conns {
+	if c.CollectTCPv6Conns {
 		enableProbe(p, probes.TCPv6Connect)
 		enableProbe(p, probes.TCPv6ConnectReturn)
+	}
 
+	if c.CollectUDPv6Conns {
 		if kv < kernel.VersionCode(5, 18, 0) {
 			if kv < kernel.VersionCode(4, 7, 0) {
 				enableProbe(p, probes.IP6MakeSkbPre470)
@@ -509,7 +511,7 @@ func (t *tracerOffsetGuesser) checkAndUpdateCurrentOffset(mp *ebpf.Map, expected
 	}
 
 	// This assumes `GuessDAddrIPv6` is the last stage of the process.
-	if t.status.What == uint64(GuessDAddrIPv6) && t.status.Ipv6_enabled == disabled {
+	if t.status.What == uint64(GuessDAddrIPv6) && (t.status.Tcpv6_enabled == disabled && t.status.Udpv6_enabled == disabled) {
 		return t.setReadyState(mp)
 	}
 
@@ -531,7 +533,7 @@ func (t *tracerOffsetGuesser) setReadyState(mp *ebpf.Map) error {
 }
 
 func flowi6EntryState(status *TracerStatus) GuessWhat {
-	if status.Ipv6_enabled == disabled {
+	if status.Udpv6_enabled == disabled {
 		return GuessNetNS
 	}
 	return GuessSAddrFl6
@@ -579,15 +581,17 @@ func (t *tracerOffsetGuesser) Guess(cfg *config.Config) ([]manager.ConstantEdito
 	}
 
 	t.status = &TracerStatus{
-		State:        uint64(StateChecking),
-		Proc:         Proc{Comm: cProcName},
-		Ipv6_enabled: enabled,
-		What:         uint64(GuessSAddr),
+		State:         uint64(StateChecking),
+		Proc:          Proc{Comm: cProcName},
+		Tcpv6_enabled: enabled,
+		Udpv6_enabled: enabled,
+		What:          uint64(GuessSAddr),
 	}
-
-	kv, err := kernel.HostVersion()
-	if err != nil {
-		return nil, err
+	if !cfg.CollectTCPv6Conns {
+		t.status.Tcpv6_enabled = disabled
+	}
+	if !cfg.CollectUDPv6Conns {
+		t.status.Udpv6_enabled = disabled
 	}
 
 	// if we already have the offsets, just return
@@ -596,8 +600,7 @@ func (t *tracerOffsetGuesser) Guess(cfg *config.Config) ([]manager.ConstantEdito
 		return t.getConstantEditors(), nil
 	}
 
-	guessFlowI6 := cfg.CollectIPv6Conns && kv < kernel.VersionCode(5, 18, 0)
-	eventGenerator, err := newTracerEventGenerator(guessFlowI6)
+	eventGenerator, err := newTracerEventGenerator(cfg.CollectUDPv6Conns)
 	if err != nil {
 		return nil, err
 	}
@@ -663,7 +666,8 @@ func (t *tracerOffsetGuesser) getConstantEditors() []manager.ConstantEditor {
 		{Name: "offset_rtt", Value: t.status.Offset_rtt},
 		{Name: "offset_rtt_var", Value: t.status.Offset_rtt_var},
 		{Name: "offset_daddr_ipv6", Value: t.status.Offset_daddr_ipv6},
-		{Name: "ipv6_enabled", Value: uint64(t.status.Ipv6_enabled)},
+		{Name: "tcpv6_enabled", Value: uint64(t.status.Tcpv6_enabled)},
+		{Name: "udpv6_enabled", Value: uint64(t.status.Udpv6_enabled)},
 		{Name: "offset_saddr_fl4", Value: t.status.Offset_saddr_fl4},
 		{Name: "offset_daddr_fl4", Value: t.status.Offset_daddr_fl4},
 		{Name: "offset_sport_fl4", Value: t.status.Offset_sport_fl4},

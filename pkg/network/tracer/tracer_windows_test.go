@@ -21,7 +21,3 @@ func httpSupported(t *testing.T) bool {
 func classificationSupported(config *config.Config) bool {
 	return true
 }
-
-func isTestIPv6Enabled(cfg *config.Config) bool {
-	return true
-}

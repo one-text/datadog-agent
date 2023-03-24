@@ -504,9 +504,8 @@ func TestTranslationBindingRegression(t *testing.T) {
 
 func TestUnconnectedUDPSendIPv6(t *testing.T) {
 	cfg := testConfig()
-	cfg.CollectIPv6Conns = true
-	if !isTestIPv6Enabled(cfg) {
-		t.Skip("IPv6 not enabled on host")
+	if !cfg.CollectUDPv6Conns {
+		t.Skip("UDPv6 disabled")
 	}
 
 	tr := setupTracer(t, cfg)
@@ -1179,8 +1178,8 @@ func TestUDPReusePort(t *testing.T) {
 		testUDPReusePort(t, "udp4", "127.0.0.1")
 	})
 	t.Run("v6", func(t *testing.T) {
-		if !isTestIPv6Enabled(testConfig()) {
-			t.Skip("IPv6 disabled")
+		if !testConfig().CollectUDPv6Conns {
+			t.Skip("UDPv6 disabled")
 		}
 		testUDPReusePort(t, "udp6", "[::1]")
 	})
@@ -1420,10 +1419,6 @@ func TestSendfileRegression(t *testing.T) {
 
 	for _, family := range []network.ConnectionFamily{network.AFINET, network.AFINET6} {
 		t.Run(family.String(), func(t *testing.T) {
-			if family == network.AFINET6 && !isTestIPv6Enabled(cfg) {
-				t.Skip("IPv6 disabled")
-			}
-
 			t.Run("TCP", func(t *testing.T) {
 				// Start TCP server
 				var rcvd int64
@@ -1444,6 +1439,9 @@ func TestSendfileRegression(t *testing.T) {
 				testSendfileServer(t, c.(*net.TCPConn), network.TCP, family, func() int64 { return rcvd })
 			})
 			t.Run("UDP", func(t *testing.T) {
+				if family == network.AFINET6 && !cfg.CollectUDPv6Conns {
+					t.Skip("UDPv6 disabled")
+				}
 				if isPrebuilt(cfg) && kv < kv470 {
 					t.Skip("UDP will fail with prebuilt tracer")
 				}
@@ -1871,14 +1869,4 @@ func TestConntrackerFallback(t *testing.T) {
 		require.NotNil(t, conntracker)
 		conntracker.Close()
 	}
-}
-
-func isTestIPv6Enabled(cfg *config.Config) bool {
-	if kernel.IsIPv6Enabled() {
-		if !cfg.EnableRuntimeCompiler && !cfg.EnableCORE && kv >= kernel.VersionCode(5, 18, 0) {
-			return false
-		}
-		return true
-	}
-	return false
 }

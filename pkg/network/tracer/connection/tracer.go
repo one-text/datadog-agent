@@ -133,7 +133,6 @@ func NewTracer(config *config.Config, constants []manager.ConstantEditor, bpfTel
 			probes.PidFDBySockMap:                    {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 			probes.ConnectionProtocolMap:             {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries},
 			probes.ConnectionTupleToSocketSKBConnMap: {Type: ebpf.Hash, MaxEntries: uint32(config.MaxTrackedConnections), EditorFlag: manager.EditMaxEntries}},
-		ConstantEditors: constants,
 	}
 
 	closedChannelSize := defaultClosedChannelSize
@@ -154,6 +153,7 @@ func NewTracer(config *config.Config, constants []manager.ConstantEditor, bpfTel
 	}
 
 	if err != nil {
+		mgrOptions.ConstantEditors = constants
 		// load the kprobe tracer
 		log.Info("fentry tracer not supported, falling back to kprobe tracer")
 		closeTracerFn, err = kprobe.LoadTracer(config, m, mgrOptions, perfHandlerTCP)
@@ -438,7 +438,7 @@ func (t *tracer) Type() TracerType {
 }
 
 func initializePortBindingMaps(config *config.Config, m *manager.Manager) error {
-	tcpPorts, err := network.ReadInitialState(config.ProcRoot, network.TCP, config.CollectIPv6Conns, true)
+	tcpPorts, err := network.ReadInitialState(config.ProcRoot, network.TCP, config.CollectTCPv6Conns, true)
 	if err != nil {
 		return fmt.Errorf("failed to read initial TCP pid->port mapping: %s", err)
 	}
@@ -456,7 +456,7 @@ func initializePortBindingMaps(config *config.Config, m *manager.Manager) error 
 		}
 	}
 
-	udpPorts, err := network.ReadInitialState(config.ProcRoot, network.UDP, config.CollectIPv6Conns, false)
+	udpPorts, err := network.ReadInitialState(config.ProcRoot, network.UDP, config.CollectUDPv6Conns, false)
 	if err != nil {
 		return fmt.Errorf("failed to read initial UDP pid->port mapping: %s", err)
 	}

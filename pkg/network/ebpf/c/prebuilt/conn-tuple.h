@@ -67,7 +67,7 @@ static __always_inline int read_conn_tuple_partial(conn_tuple_t * t, struct sock
             return 0;
         }
     } else if (check_family(skp, __AF_INET6)) {
-        if (!is_ipv6_enabled()) {
+        if (!is_tcpv6_enabled() && !is_udpv6_enabled()) {
             return 0;
         }
 

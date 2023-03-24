@@ -19,7 +19,6 @@ import (
 	"math/rand"
 	"net"
 	nethttp "net/http"
-	"net/netip"
 	"os"
 	"runtime"
 	"strconv"
@@ -39,6 +38,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/network"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	"github.com/DataDog/datadog-agent/pkg/process/util"
+	"github.com/DataDog/datadog-agent/pkg/util/kernel"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
@@ -333,10 +333,7 @@ func TestTCPShortLived(t *testing.T) {
 func TestTCPOverIPv6(t *testing.T) {
 	t.SkipNow()
 	cfg := testConfig()
-	cfg.CollectIPv6Conns = true
-	if !isTestIPv6Enabled(cfg) {
-		t.Skip("IPv6 not enabled on host")
-	}
+	cfg.CollectTCPv6Conns = true
 	tr := setupTracer(t, cfg)
 
 	ln, err := net.Listen("tcp6", ":0")
@@ -396,7 +393,8 @@ func TestTCPCollectionDisabled(t *testing.T) {
 	}
 	// Enable BPF-based system probe with TCP disabled
 	cfg := testConfig()
-	cfg.CollectTCPConns = false
+	cfg.CollectTCPv4Conns = false
+	cfg.CollectTCPv6Conns = false
 	tr := setupTracer(t, cfg)
 
 	// Create TCP Server which sends back serverMessageSize bytes
@@ -433,7 +431,8 @@ func TestTCPCollectionDisabled(t *testing.T) {
 func TestTCPConnsReported(t *testing.T) {
 	// Setup
 	cfg := testConfig()
-	cfg.CollectTCPConns = true
+	cfg.CollectTCPv4Conns = true
+	cfg.CollectTCPv6Conns = true
 	tr := setupTracer(t, cfg)
 
 	processedChan := make(chan struct{})
@@ -462,6 +461,9 @@ func TestTCPConnsReported(t *testing.T) {
 
 func TestUDPSendAndReceive(t *testing.T) {
 	t.Run("v4", func(t *testing.T) {
+		if !testConfig().CollectUDPv4Conns {
+			t.Skip("UDPv4 disabled")
+		}
 		t.Run("fixed port", func(t *testing.T) {
 			testUDPSendAndReceive(t, "127.0.0.1:8081")
 		})
@@ -470,6 +472,9 @@ func TestUDPSendAndReceive(t *testing.T) {
 		})
 	})
 	t.Run("v6", func(t *testing.T) {
+		if !testConfig().CollectUDPv6Conns {
+			t.Skip("UDPv6 disabled")
+		}
 		t.Run("fixed port", func(t *testing.T) {
 			testUDPSendAndReceive(t, "[::1]:8081")
 		})
@@ -481,9 +486,6 @@ func TestUDPSendAndReceive(t *testing.T) {
 
 func testUDPSendAndReceive(t *testing.T, addr string) {
 	cfg := testConfig()
-	if netip.MustParseAddrPort(addr).Addr().Is6() && !isTestIPv6Enabled(cfg) {
-		t.Skip("IPv6 disabled")
-	}
 	tr := setupTracer(t, cfg)
 
 	server := &UDPServer{
@@ -537,7 +539,8 @@ func testUDPSendAndReceive(t *testing.T, addr string) {
 func TestUDPDisabled(t *testing.T) {
 	// Enable BPF-based system probe with UDP disabled
 	cfg := testConfig()
-	cfg.CollectUDPConns = false
+	cfg.CollectUDPv4Conns = false
+	cfg.CollectUDPv6Conns = false
 	tr := setupTracer(t, cfg)
 
 	// Create UDP Server which sends back serverMessageSize bytes
@@ -600,8 +603,7 @@ func TestLocalDNSCollectionEnabled(t *testing.T) {
 	// Enable BPF-based system probe with DNS enabled
 	cfg := testConfig()
 	cfg.CollectLocalDNS = true
-	cfg.CollectUDPConns = true
-
+	cfg.CollectUDPv4Conns = true
 	tr := setupTracer(t, cfg)
 
 	// Connect to local DNS
@@ -1231,9 +1233,8 @@ func TestUnconnectedUDPSendIPv4(t *testing.T) {
 
 func TestConnectedUDPSendIPv6(t *testing.T) {
 	cfg := testConfig()
-	cfg.CollectIPv6Conns = true
-	if !isTestIPv6Enabled(cfg) {
-		t.Skip("IPv6 not enabled on host")
+	if !testConfig().CollectUDPv6Conns {
+		t.Skip("UDPv6 disabled")
 	}
 	tr := setupTracer(t, cfg)
 
@@ -1258,7 +1259,8 @@ func TestConnectedUDPSendIPv6(t *testing.T) {
 
 func TestConnectionClobber(t *testing.T) {
 	cfg := testConfig()
-	cfg.CollectUDPConns = false
+	cfg.CollectUDPv4Conns = false
+	cfg.CollectUDPv6Conns = false
 	cfg.ExcludedDestinationConnections = map[string][]string{
 		"0.0.0.0/2":   {"*"},
 		"64.0.0.0/3":  {"*"},
@@ -1441,6 +1443,10 @@ func testConfig() *config.Config {
 	if ddconfig.IsECSFargate() {
 		// protocol classification not yet supported on fargate
 		cfg.ProtocolClassificationEnabled = false
+	}
+	// prebuilt on 5.18+ does not support UDPv6
+	if isPrebuilt(cfg) && kv >= kernel.VersionCode(5, 18, 0) {
+		cfg.CollectUDPv6Conns = false
 	}
 	return cfg
 }
