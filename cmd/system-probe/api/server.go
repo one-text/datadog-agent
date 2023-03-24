@@ -47,8 +47,8 @@ func StartServer(cfg *config.Config) error {
 
 	mux.Handle("/debug/vars", http.DefaultServeMux)
 
-	allowedUsrID, allowedGrpID, err := filesystem.UserDDAgent()
-	if err != nil {
+	found, allowedUsrID, allowedGrpID, err := filesystem.UserDDAgent()
+	if err != nil || !found {
 		// if user dd-agent doesn't exist, map to root
 		allowedUsrID = 0
 		allowedGrpID = 0
