@@ -145,8 +145,13 @@ func NewTracer(config *config.Config, constants []manager.ConstantEditor, bpfTel
 	}
 
 	var tracerType TracerType = EBPFFentry
+	fentryOptions := mgrOptions
+	fentryOptions.ConstantEditors = []manager.ConstantEditor{
+		{Name: "tcpv6_enabled", Value: boolToUint64(config.CollectTCPv6Conns)},
+		{Name: "udpv6_enabled", Value: boolToUint64(config.CollectUDPv6Conns)},
+	}
 	var closeTracerFn func()
-	closeTracerFn, err := fentry.LoadTracer(config, m, mgrOptions, perfHandlerTCP)
+	closeTracerFn, err := fentry.LoadTracer(config, m, fentryOptions, perfHandlerTCP)
 	if err != nil && !errors.Is(err, fentry.ErrorNotSupported) {
 		// failed to load fentry tracer
 		return nil, err
@@ -207,6 +212,13 @@ func NewTracer(config *config.Config, constants []manager.ConstantEditor, bpfTel
 	}
 
 	return tr, nil
+}
+
+func boolToUint64(b bool) uint64 {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func (t *tracer) Start(callback func([]network.ConnectionStats)) (err error) {
