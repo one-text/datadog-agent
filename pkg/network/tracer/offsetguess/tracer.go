@@ -198,7 +198,7 @@ func (*tracerOffsetGuesser) Probes(c *config.Config) (map[probes.ProbeFuncName]s
 		return nil, err
 	}
 
-	if c.CollectTCPv6Conns {
+	if c.CollectTCPv6Conns || c.CollectUDPv6Conns {
 		enableProbe(p, probes.TCPv6Connect)
 		enableProbe(p, probes.TCPv6ConnectReturn)
 	}
@@ -620,12 +620,12 @@ func (t *tracerOffsetGuesser) Guess(cfg *config.Config) ([]manager.ConstantEdito
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving expected value: %w", err)
 	}
-	log.Tracef("expected values: %+v", expected)
 
 	err = eventGenerator.populateUDPExpectedValues(expected)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving expected value: %w", err)
 	}
+	log.Tracef("expected values: %+v", expected)
 
 	protocolClassificationSupported := kprobe.ClassificationSupported(cfg)
 	log.Debugf("Checking for offsets with threshold of %d", threshold)
