@@ -1798,7 +1798,10 @@ func TestEbpfConntrackerFallback(t *testing.T) {
 		{true, true, true, true, assert.AnError, false},
 	}
 
-	cfg := testConfig()
+	cfg := config.New()
+	if kv >= kernel.VersionCode(5, 18, 0) {
+		cfg.CollectUDPv6Conns = false
+	}
 	constants, err := getTracerOffsets(t, cfg)
 	require.NoError(t, err)
 	t.Cleanup(func() {

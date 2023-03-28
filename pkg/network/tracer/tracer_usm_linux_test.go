@@ -793,39 +793,35 @@ func TestHTTPGoTLSAttachProbes(t *testing.T) {
 		t.Skip("GoTLS not supported for this setup")
 	}
 
-	t.Run("new process (runtime compilation)", func(t *testing.T) {
+	t.Run("runtime compilation", func(t *testing.T) {
 		cfg := testConfig()
 		cfg.EnableRuntimeCompiler = true
 		cfg.AllowPrecompiledFallback = false
 		cfg.EnableCORE = false
-		testHTTPGoTLSCaptureNewProcess(t, cfg)
+
+		t.Run("new process", func(t *testing.T) {
+			testHTTPGoTLSCaptureNewProcess(t, cfg)
+		})
+		t.Run("already running process", func(t *testing.T) {
+			testHTTPGoTLSCaptureAlreadyRunning(t, cfg)
+		})
 	})
 
-	t.Run("already running process (runtime compilation)", func(t *testing.T) {
-		cfg := testConfig()
-		cfg.EnableRuntimeCompiler = true
-		cfg.AllowPrecompiledFallback = false
-		cfg.EnableCORE = false
-		testHTTPGoTLSCaptureAlreadyRunning(t, cfg)
-	})
-
-	// note: this is a bit of hack since CI runs an entire package either as
-	// runtime, CO-RE, or pre-built. here we're piggybacking on the runtime pass
-	// and running the CO-RE tests as well
-	t.Run("new process (co-re)", func(t *testing.T) {
+	t.Run("CO-RE", func(t *testing.T) {
+		// note: this is a bit of hack since CI runs an entire package either as
+		// runtime, CO-RE, or pre-built. here we're piggybacking on the runtime pass
+		// and running the CO-RE tests as well
 		cfg := testConfig()
 		cfg.EnableCORE = true
 		cfg.EnableRuntimeCompiler = false
 		cfg.AllowRuntimeCompiledFallback = false
-		testHTTPGoTLSCaptureNewProcess(t, cfg)
-	})
 
-	t.Run("already running process (co-re)", func(t *testing.T) {
-		cfg := testConfig()
-		cfg.EnableCORE = true
-		cfg.EnableRuntimeCompiler = false
-		cfg.AllowRuntimeCompiledFallback = false
-		testHTTPGoTLSCaptureAlreadyRunning(t, cfg)
+		t.Run("new process", func(t *testing.T) {
+			testHTTPGoTLSCaptureNewProcess(t, cfg)
+		})
+		t.Run("already running process", func(t *testing.T) {
+			testHTTPGoTLSCaptureAlreadyRunning(t, cfg)
+		})
 	})
 }
 
