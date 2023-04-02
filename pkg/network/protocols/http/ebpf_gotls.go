@@ -233,7 +233,10 @@ func (p *GoTLSProgram) Start() {
 		return
 	}
 
-	if err := netlink.ProcEventMonitor(p.procMonitor.events, p.procMonitor.done, p.procMonitor.errors); err != nil {
+	hostProc := util.HostProc()
+	if err := util.WithRootNS(hostProc, func() error {
+		return netlink.ProcEventMonitor(p.procMonitor.events, p.procMonitor.done, p.procMonitor.errors)
+	}); err != nil {
 		log.Errorf("could not create process monitor: %s", err)
 		return
 	}
