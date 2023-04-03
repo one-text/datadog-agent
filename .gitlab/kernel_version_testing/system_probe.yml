@@ -33,7 +33,7 @@ pull_test_dockers_arm64:
   stage: kernel_matrix_testing
   rules:
     !reference [.on_system_probe_changes_or_manual]
-  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-buildimages/btf-gen:$DATADOG_AGENT_BTF_GEN_BUILDIMAGES
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-buildimages/btf-gen:$DATADOG_AGENT_SYSPROBE_BUILDIMAGES
   tags: ["runner:main"]
   script:
     # Build dependencies directory
@@ -59,6 +59,8 @@ pull_test_dockers_arm64:
     # copy system probe tests
     - mkdir -p $SYSTEM_PROBE_TESTS
     - cp -R $KITCHEN_TESTS $SYSTEM_PROBE_TESTS
+    # Compile system-probe-test_spec.go
+    - go build $CI_PROJECT_DIR/test/new-e2e/system-probe/system-probe-test_spec.go
     - popd
     # package all the dependencies
     - ls -la $DEPENDENCIES
