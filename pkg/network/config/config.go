@@ -31,8 +31,6 @@ const (
 	maxOffsetThreshold     = 3000
 
 	defaultMaxProcessesTracked = 1024
-
-	defaultSSLAsyncHandshakeWindow = 500000 // 500 us
 )
 
 // Config stores all flags used by the network eBPF tracer
@@ -360,9 +358,6 @@ func New() *Config {
 		// closed connections in environments with mostly short-lived
 		// connections
 		c.MaxClosedConnectionsBuffered = int(c.MaxTrackedConnections)
-	}
-	if !cfg.IsSet(join(smNS, "ssl_async_handshake_window")) {
-		c.SSLAsyncHandshakeWindow = defaultSSLAsyncHandshakeWindow
 	}
 	if c.HTTPNotificationThreshold >= c.MaxTrackedHTTPConnections {
 		log.Warnf("Notification threshold set higher than tracked connections.  %d > %d ; resetting to %d",

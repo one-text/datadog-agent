@@ -182,6 +182,7 @@ func InitSystemProbeConfig(cfg Config) {
 	cfg.BindEnvAndSetDefault(join(netNS, "enable_gateway_lookup"), true, "DD_SYSTEM_PROBE_NETWORK_ENABLE_GATEWAY_LOOKUP")
 	cfg.BindEnvAndSetDefault(join(netNS, "max_http_stats_buffered"), 100000, "DD_SYSTEM_PROBE_NETWORK_MAX_HTTP_STATS_BUFFERED")
 	cfg.BindEnvAndSetDefault(join(smNS, "max_kafka_stats_buffered"), 100000)
+	cfg.BindEnvAndSetDefault(join(smNS, "ssl_async_handshake_window"), 500000) // 500 us
 	httpRules := join(netNS, "http_replace_rules")
 	cfg.BindEnv(httpRules, "DD_SYSTEM_PROBE_NETWORK_HTTP_REPLACE_RULES")
 	cfg.SetEnvKeyTransformer(httpRules, func(in string) interface{} {
