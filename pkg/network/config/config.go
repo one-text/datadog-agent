@@ -31,6 +31,8 @@ const (
 	maxOffsetThreshold     = 3000
 
 	defaultMaxProcessesTracked = 1024
+
+	defaultSSLAsyncHandshakeWindow = 500000 // 500 us
 )
 
 // Config stores all flags used by the network eBPF tracer
@@ -109,6 +111,12 @@ type Config struct {
 	// HTTPMaxRequestFragment is the size of the HTTP path buffer to be retrieved.
 	// Currently Windows only
 	HTTPMaxRequestFragment int64
+
+	// SSLAsyncHandshakeWindow is the duration between a SSL_do_handshake() and tcp_sendmsg() calls
+	// to have a valid correlation between the ssl context with the struct sock matching the same pid/tid
+	// only valid for openssl async implementation
+	// unit : nanoseconds
+	SSLAsyncHandshakeWindow uint64
 
 	// JavaAgentDebug will enable debug output of the injected USM agent
 	JavaAgentDebug bool
@@ -293,11 +301,12 @@ func New() *Config {
 
 		ProtocolClassificationEnabled: cfg.GetBool(join(netNS, "enable_protocol_classification")),
 
-		EnableHTTPMonitoring:  cfg.GetBool(join(netNS, "enable_http_monitoring")),
-		EnableHTTP2Monitoring: cfg.GetBool(join(smNS, "enable_http2_monitoring")),
-		EnableHTTPSMonitoring: cfg.GetBool(join(netNS, "enable_https_monitoring")),
-		MaxHTTPStatsBuffered:  cfg.GetInt(join(netNS, "max_http_stats_buffered")),
-		MaxKafkaStatsBuffered: cfg.GetInt(join(smNS, "max_kafka_stats_buffered")),
+		EnableHTTPMonitoring:    cfg.GetBool(join(netNS, "enable_http_monitoring")),
+		EnableHTTP2Monitoring:   cfg.GetBool(join(smNS, "enable_http2_monitoring")),
+		EnableHTTPSMonitoring:   cfg.GetBool(join(netNS, "enable_https_monitoring")),
+		SSLAsyncHandshakeWindow: uint64(cfg.GetInt64(join(smNS, "ssl_async_handshake_window"))),
+		MaxHTTPStatsBuffered:    cfg.GetInt(join(netNS, "max_http_stats_buffered")),
+		MaxKafkaStatsBuffered:   cfg.GetInt(join(smNS, "max_kafka_stats_buffered")),
 
 		MaxTrackedHTTPConnections: cfg.GetInt64(join(netNS, "max_tracked_http_connections")),
 		HTTPNotificationThreshold: cfg.GetInt64(join(netNS, "http_notification_threshold")),
@@ -351,6 +360,9 @@ func New() *Config {
 		// closed connections in environments with mostly short-lived
 		// connections
 		c.MaxClosedConnectionsBuffered = int(c.MaxTrackedConnections)
+	}
+	if !cfg.IsSet(join(smNS, "ssl_async_handshake_window")) {
+		c.SSLAsyncHandshakeWindow = defaultSSLAsyncHandshakeWindow
 	}
 	if c.HTTPNotificationThreshold >= c.MaxTrackedHTTPConnections {
 		log.Warnf("Notification threshold set higher than tracked connections.  %d > %d ; resetting to %d",

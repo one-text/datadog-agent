@@ -29,6 +29,12 @@
 
 #define HTTPS_PORT 443
 
+static __always_inline __u64 ssl_async_handshake_window() {
+    __u64 val = 0;
+    LOAD_CONSTANT("ssl_async_handshake_window", val);
+    return val;
+}
+
 static __always_inline int read_conn_tuple(conn_tuple_t* t, struct sock* skp, u64 pid_tgid, metadata_mask_t type);
 static __always_inline int http_process(http_transaction_t *http_stack, skb_info_t *skb_info, __u64 tags);
 
@@ -153,7 +159,7 @@ static __always_inline void map_ssl_ctx_to_sock(struct sock *skp) {
         return;
     }
     if (args->timestamp > 0) {
-        if ((bpf_ktime_get_ns() - args->timestamp) > 500000) { // 500us
+        if ((bpf_ktime_get_ns() - args->timestamp) > ssl_async_handshake_window()) { /* 500 us by default */
             return;
         }
     }
