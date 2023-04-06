@@ -103,7 +103,7 @@ type soWatcher struct {
 }
 
 type soRegistry struct {
-	m     sync.Mutex
+	m     sync.RWMutex
 	byID  map[pathIdentifier]*soRegistration
 	byPID map[uint32]*soRegistration
 
@@ -139,7 +139,7 @@ type soRegistration struct {
 }
 
 // Unregister return true if there are no more reference to this registration
-func (r *soRegistration) Unregister() bool {
+func (r *soRegistration) unregister() bool {
 	r.refcount--
 	if r.refcount > 0 {
 		return false
@@ -274,20 +274,23 @@ func (r *soRegistry) cleanup() {
 	defer r.m.Unlock()
 
 	for _, reg := range r.byID {
-		reg.Unregister()
+		reg.unregister()
 	}
 }
 
 // Unregister a pid if exist, unregisterCB will be called if his refcount == 0
 func (r *soRegistry) Unregister(pid uint32) {
-	r.m.Lock()
-	defer r.m.Unlock()
-
+	r.m.RLock()
 	reg, found := r.byPID[pid]
 	if !found {
+		r.m.RUnlock()
 		return
 	}
-	if reg.Unregister() == true {
+	r.m.RUnlock()
+
+	r.m.Lock()
+	defer r.m.Unlock()
+	if reg.unregister() == true {
 		// we need to cleanup our entries as there are no more processes using this ELF
 		delete(r.byID, reg.pathID)
 	}
