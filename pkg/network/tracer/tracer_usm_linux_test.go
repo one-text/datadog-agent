@@ -801,6 +801,7 @@ func TestJavaInjection(t *testing.T) {
 			preTracerSetup: func(t *testing.T, ctx testContext) {
 				log.SetupLogger(seelog.Default, "debug")
 				cfg.JavaDir = legacyJavaDir
+				cfg.SSLAsyncHandshakeWindow = 1000000
 			},
 			postTracerSetup: func(t *testing.T, ctx testContext) {
 				javatestutil.RunJavaVersion(t, "openjdk:15-oraclelinux8", "-cp /v/netty/target/dependency/*:/v/netty/target/NettyClient-1.jar -Dio.netty.native.deleteLibAfterLoading=false com.datadoghq.NettyClient sslengine=openssl", regexp.MustCompile("END OF CONTENT"))
@@ -826,6 +827,7 @@ func TestJavaInjection(t *testing.T) {
 			preTracerSetup: func(t *testing.T, ctx testContext) {
 				log.SetupLogger(seelog.Default, "debug")
 				cfg.JavaDir = legacyJavaDir
+				cfg.SSLAsyncHandshakeWindow = 1000000
 			},
 			postTracerSetup: func(t *testing.T, ctx testContext) {
 				javatestutil.RunJavaVersion(t, "openjdk:15-oraclelinux8", "-cp /v/netty/target/dependency/*:/v/netty/target/NettyClient-1.jar -Dio.netty.native.deleteLibAfterLoading=false com.datadoghq.NettyClient sslengine=openssl_refcnt", regexp.MustCompile("END OF CONTENT"))
