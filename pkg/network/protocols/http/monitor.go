@@ -235,7 +235,8 @@ func (m *Monitor) Start() error {
 	}
 
 	// Need to explicitly save the error in `err` so the defer function could save the startup error.
-	return m.processMonitor.Initialize()
+	err = m.processMonitor.Initialize()
+	return err
 }
 
 func (m *Monitor) GetUSMStats() map[string]interface{} {
