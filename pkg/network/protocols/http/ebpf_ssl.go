@@ -9,20 +9,17 @@
 package http
 
 import (
-	"debug/elf"
-	"os"
-	"regexp"
-	"strings"
-
 	manager "github.com/DataDog/ebpf-manager"
 	"github.com/cilium/ebpf"
+	"github.com/twmb/murmur3"
+	"os"
+	"regexp"
+	"strconv"
 
 	ddebpf "github.com/DataDog/datadog-agent/pkg/ebpf"
 	"github.com/DataDog/datadog-agent/pkg/network/config"
 	"github.com/DataDog/datadog-agent/pkg/network/ebpf/probes"
-	"github.com/DataDog/datadog-agent/pkg/network/go/bininspect"
 	errtelemetry "github.com/DataDog/datadog-agent/pkg/network/telemetry"
-	"github.com/DataDog/datadog-agent/pkg/util/common"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
@@ -293,7 +290,7 @@ func (o *sslProgram) ConfigureOptions(options *manager.Options) {
 
 func (o *sslProgram) Start() {
 	// Setup shared library watcher and configure the appropriate callbacks
-	o.watcher = newSOWatcher(o.perfHandler,
+	o.watcher = newSOWatcher(o.cfg.ProcRoot, o.perfHandler,
 		soRule{
 			re:           regexp.MustCompile(`libssl.so`),
 			registerCB:   addHooks(o.manager, openSSLProbes),
@@ -318,43 +315,14 @@ func (o *sslProgram) Stop() {
 	o.perfHandler.Stop()
 }
 
-func addHooks(m *errtelemetry.Manager, probes []manager.ProbesSelector) func(pathIdentifier, string, string) error {
-	return func(id pathIdentifier, root string, path string) error {
-		uid := getUID(id)
-
-		elfFile, err := elf.Open(root + path)
-		if err != nil {
-			return err
-		}
-		defer elfFile.Close()
-
-		symbolsSet := make(common.StringSet, 0)
-		symbolsSetBestEffort := make(common.StringSet, 0)
-		for _, singleProbe := range probes {
-			_, isBestEffort := singleProbe.(*manager.BestEffort)
-			for _, selector := range singleProbe.GetProbesIdentificationPairList() {
-				_, symbol, ok := strings.Cut(selector.EBPFFuncName, "__")
-				if !ok {
-					continue
-				}
-				if isBestEffort {
-					symbolsSetBestEffort[symbol] = struct{}{}
-				} else {
-					symbolsSet[symbol] = struct{}{}
-				}
-			}
-		}
-		symbolMap, err := bininspect.GetAllSymbolsByName(elfFile, symbolsSet)
-		if err != nil {
-			return err
-		}
-		/* Best effort to resolve symbols, so we don't care about the error */
-		symbolMapBestEffort, _ := bininspect.GetAllSymbolsByName(elfFile, symbolsSetBestEffort)
+func addHooks(m *errtelemetry.Manager, probes []manager.ProbesSelector) func(string) error {
+	return func(libPath string) error {
+		uid := getUID(libPath)
 
 		for _, singleProbe := range probes {
-			_, isBestEffort := singleProbe.(*manager.BestEffort)
 			for _, selector := range singleProbe.GetProbesIdentificationPairList() {
 				identifier := manager.ProbeIdentificationPair{
+					EBPFSection:  selector.EBPFSection,
 					EBPFFuncName: selector.EBPFFuncName,
 					UID:          uid,
 				}
@@ -371,29 +339,9 @@ func addHooks(m *errtelemetry.Manager, probes []manager.ProbesSelector) func(pat
 					continue
 				}
 
-				_, symbol, ok := strings.Cut(selector.EBPFFuncName, "__")
-				if !ok {
-					continue
-				}
-
-				sym := symbolMap[symbol]
-				if isBestEffort {
-					sym, found = symbolMapBestEffort[symbol]
-					if !found {
-						continue
-					}
-				}
-				manager.SanitizeUprobeAddresses(elfFile, []elf.Symbol{sym})
-				offset, err := bininspect.SymbolToOffset(elfFile, sym)
-				if err != nil {
-					return err
-				}
-
 				newProbe := &manager.Probe{
 					ProbeIdentificationPair: identifier,
-					BinaryPath:              root + path,
-					UprobeOffset:            uint64(offset),
-					HookFuncName:            symbol,
+					BinaryPath:              libPath,
 				}
 				_ = m.AddHook("", newProbe)
 			}
@@ -406,12 +354,13 @@ func addHooks(m *errtelemetry.Manager, probes []manager.ProbesSelector) func(pat
 	}
 }
 
-func removeHooks(m *errtelemetry.Manager, probes []manager.ProbesSelector) func(pathIdentifier) error {
-	return func(lib pathIdentifier) error {
-		uid := getUID(lib)
+func removeHooks(m *errtelemetry.Manager, probes []manager.ProbesSelector) func(string) error {
+	return func(libPath string) error {
+		uid := getUID(libPath)
 		for _, singleProbe := range probes {
 			for _, selector := range singleProbe.GetProbesIdentificationPairList() {
 				identifier := manager.ProbeIdentificationPair{
+					EBPFSection:  selector.EBPFSection,
 					EBPFFuncName: selector.EBPFFuncName,
 					UID:          uid,
 				}
@@ -423,7 +372,7 @@ func removeHooks(m *errtelemetry.Manager, probes []manager.ProbesSelector) func(
 				program := probe.Program()
 				err := m.DetachHook(identifier)
 				if err != nil {
-					log.Debugf("detach hook %s/%s : %s", selector.EBPFFuncName, uid, err)
+					log.Debugf("detach hook %s/%s/%s : %s", selector.EBPFSection, selector.EBPFFuncName, uid, err)
 				}
 				if program != nil {
 					program.Close()
@@ -435,17 +384,14 @@ func removeHooks(m *errtelemetry.Manager, probes []manager.ProbesSelector) func(
 	}
 }
 
-// getUID() return a key of length 5 as the kernel uprobe registration path is limited to a length of 64
-// ebpf-manager/utils.go:GenerateEventName() MaxEventNameLen = 64
-// MAX_EVENT_NAME_LEN (linux/kernel/trace/trace.h)
-//
-// Length 5 is arbitrary value as the full string of the eventName format is
-//
-//	fmt.Sprintf("%s_%.*s_%s_%s", probeType, maxFuncNameLen, functionName, UID, attachPIDstr)
-//
-// functionName is variable but with a minimum guarantee of 10 chars
-func getUID(lib pathIdentifier) string {
-	return lib.Key()[:5]
+func getUID(libPath string) string {
+	sum := murmur3.StringSum64(libPath)
+	hash := strconv.FormatInt(int64(sum), 16)
+	if len(hash) >= 5 {
+		return hash[len(hash)-5:]
+	}
+
+	return libPath
 }
 
 func (*sslProgram) GetAllUndefinedProbes() []manager.ProbeIdentificationPair {

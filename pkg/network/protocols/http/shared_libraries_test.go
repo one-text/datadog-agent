@@ -48,14 +48,14 @@ func TestSharedLibraryDetection(t *testing.T) {
 		pathDetected string
 	)
 
-	callback := func(id pathIdentifier, root string, path string) error {
+	callback := func(path string) error {
 		mux.Lock()
 		defer mux.Unlock()
 		pathDetected = path
 		return nil
 	}
 
-	watcher := newSOWatcher(perfHandler,
+	watcher := newSOWatcher("/proc", perfHandler,
 		soRule{
 			re:         regexp.MustCompile(`foo.so`),
 			registerCB: callback,
@@ -98,14 +98,14 @@ func TestSharedLibraryDetectionWithPIDandRootNameSpace(t *testing.T) {
 		pathDetected string
 	)
 
-	callback := func(id pathIdentifier, root string, path string) error {
+	callback := func(path string) error {
 		mux.Lock()
 		defer mux.Unlock()
 		pathDetected = path
 		return nil
 	}
 
-	watcher := newSOWatcher(perfHandler,
+	watcher := newSOWatcher("/proc", perfHandler,
 		soRule{
 			re:         regexp.MustCompile(`fooroot.so`),
 			registerCB: callback,
@@ -147,12 +147,12 @@ func TestSameInodeRegression(t *testing.T) {
 	require.NoError(t, err)
 
 	registers := atomic.NewInt64(0)
-	callback := func(id pathIdentifier, root string, path string) error {
+	callback := func(path string) error {
 		registers.Add(1)
 		return nil
 	}
 
-	watcher := newSOWatcher(perfHandler,
+	watcher := newSOWatcher("/proc", perfHandler,
 		soRule{
 			re:         regexp.MustCompile(`foo.so`),
 			registerCB: callback,
