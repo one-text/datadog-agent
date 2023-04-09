@@ -19,6 +19,9 @@ type httpEncoder struct {
 	staticTags     map[http.KeyTuple]uint64
 	dynamicTagsSet map[http.KeyTuple]map[string]struct{}
 
+	dataPool  []model.HTTPStats_Data
+	poolIndex int
+
 	orphanEntries int
 }
 
@@ -107,10 +110,14 @@ func (e *httpEncoder) GetHTTPAggregationsAndTags(c network.ConnectionStats) (*mo
 }
 
 func (e *httpEncoder) buildAggregations(payload *network.Connections) {
-	aggrSize := make(map[http.KeyTuple]int)
-	for key := range payload.HTTP {
+	aggrSize := make(map[http.KeyTuple]int, len(payload.HTTP))
+	dataPoolSize := 0
+	for key, stat := range payload.HTTP {
 		aggrSize[key.KeyTuple]++
+		dataPoolSize += len(stat.Data)
 	}
+
+	e.dataPool = make([]model.HTTPStats_Data, dataPoolSize)
 
 	for key, stats := range payload.HTTP {
 		aggregation, ok := e.aggregations[key.KeyTuple]
@@ -133,17 +140,13 @@ func (e *httpEncoder) buildAggregations(payload *network.Connections) {
 			Path:              key.Path.Content,
 			FullPath:          key.Path.FullPath,
 			Method:            model.HTTPMethod(key.Method),
-			StatsByStatusCode: make(map[int32]*model.HTTPStats_Data, len(stats.Data)),
+			StatsByStatusCode: e.getDataMap(stats.Data),
 		}
 
 		staticTags := e.staticTags[key.KeyTuple]
 		var dynamicTags map[string]struct{}
 		for status, s := range stats.Data {
-			data, ok := ms.StatsByStatusCode[int32(status)]
-			if !ok {
-				ms.StatsByStatusCode[int32(status)] = &model.HTTPStats_Data{}
-				data = ms.StatsByStatusCode[int32(status)]
-			}
+			data := ms.StatsByStatusCode[int32(status)]
 			data.Count = uint32(s.Count)
 
 			if latencies := s.Latencies; latencies != nil {
@@ -172,4 +175,13 @@ func (e *httpEncoder) buildAggregations(payload *network.Connections) {
 
 		aggregation.EndpointAggregations = append(aggregation.EndpointAggregations, ms)
 	}
+}
+
+func (e *httpEncoder) getDataMap(stats map[uint16]*http.RequestStat) map[int32]*model.HTTPStats_Data {
+	res := make(map[int32]*model.HTTPStats_Data, len(stats))
+	for statusCode := range stats {
+		res[int32(statusCode)] = &e.dataPool[e.poolIndex]
+		e.poolIndex++
+	}
+	return res
 }
