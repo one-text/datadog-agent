@@ -266,6 +266,7 @@ func (pm *ProcessMonitor) Initialize() error {
 				return
 			case event, ok := <-pm.events:
 				if !ok {
+					pm.closeDone()
 					return
 				}
 				if !pm.isInitialized.Load() {
@@ -292,6 +293,7 @@ func (pm *ProcessMonitor) Initialize() error {
 
 			case err, ok := <-pm.errors:
 				if !ok {
+					pm.closeDone()
 					return
 				}
 				log.Errorf("process monitor error: %s", err)
