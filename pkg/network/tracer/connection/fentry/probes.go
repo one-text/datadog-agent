@@ -40,7 +40,8 @@ const (
 	// tcpClose traces the tcp_close() system call
 	tcpClose = "tcp_close"
 	// tcpCloseReturn traces the return of tcp_close() system call
-	tcpCloseReturn = "tcp_close_exit"
+	tcpCloseCleanProtocolReturn = "tcp_close_clean_protocols_exit"
+	tcpCloseFlushReturn         = "tcp_close_flush_exit"
 
 	// We use the following two probes for UDP
 	udpRecvMsg              = "udp_recvmsg"

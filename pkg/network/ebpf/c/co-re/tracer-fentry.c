@@ -213,8 +213,8 @@ int BPF_PROG(tcp_close, struct sock *sk, long timeout) {
     return 0;
 }
 
-SEC("fexit/tcp_close")
-int BPF_PROG(tcp_close_exit, struct sock *sk, long timeout) {
+SEC("fexit/tcp_close_clean_protocols")
+int BPF_PROG(tcp_close_clean_protocols_exit, struct sock *sk, long timeout) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
 
     conn_tuple_t *tup_ptr = (conn_tuple_t*) bpf_map_lookup_elem(&tcp_close_args, &pid_tgid);
@@ -222,6 +222,14 @@ int BPF_PROG(tcp_close_exit, struct sock *sk, long timeout) {
         clean_protocol_classification(tup_ptr);
         bpf_map_delete_elem(&tcp_close_args, &pid_tgid);
     }
+
+    bpf_tail_call_compat(ctx, &tcp_close_progs, 0);
+
+    return 0;
+}
+
+SEC("fexit/tcp_close_flush")
+int BPF_PROG(tcp_close_flush_exit, struct sock *sk, long timeout) {
     flush_conn_close_if_full(ctx);
     return 0;
 }

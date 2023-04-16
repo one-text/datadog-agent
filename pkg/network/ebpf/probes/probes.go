@@ -82,7 +82,8 @@ const (
 	// TCPClose traces the tcp_close() system call
 	TCPClose ProbeFuncName = "kprobe__tcp_close"
 	// TCPCloseReturn traces the return of tcp_close() system call
-	TCPCloseReturn ProbeFuncName = "kretprobe__tcp_close"
+	TCPCloseCleanProtocolsReturn ProbeFuncName = "kretprobe__tcp_close_clean_protocols"
+	TCPCloseFlushReturn          ProbeFuncName = "kretprobe__tcp_close_flush"
 
 	// We use the following two probes for UDP sends
 
