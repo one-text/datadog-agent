@@ -126,5 +126,5 @@ func NewAbnormalPathEvent(event *model.Event, probe *Probe, pathResolutionError 
 		return evt
 	}
 
-	return events.NewCustomRule(events.AbnormalPathRuleID), events.NewCustomEventLazy(resolutionErrorToEventType(event.PathResolutionError), marshalerCtor)
+	return events.NewCustomRule(events.AbnormalPathRuleID), events.NewCustomEventLazy(resolutionErrorToEventType(event.Error), marshalerCtor)
 }

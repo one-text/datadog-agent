@@ -681,9 +681,9 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 			if errors.As(err, &errResolution) {
 				event.SetPathResolutionError(&event.ProcessCacheEntry.FileEvent, err)
 			}
+		} else {
+			p.resolvers.ProcessResolver.AddExecEntry(event.ProcessCacheEntry)
 		}
-
-		p.resolvers.ProcessResolver.AddExecEntry(event.ProcessCacheEntry)
 
 		event.Exec.Process = &event.ProcessCacheEntry.Process
 	case model.ExitEventType:
@@ -839,7 +839,11 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 	}
 
 	// resolve the process cache entry
-	event.ProcessCacheEntry, _ = p.fieldHandlers.ResolveProcessCacheEntry(event)
+	entry, isResolved := p.fieldHandlers.ResolveProcessCacheEntry(event)
+	if !isResolved {
+		event.Error = errors.New("process context not resolved")
+	}
+	event.ProcessCacheEntry = entry
 
 	// use ProcessCacheEntry process context as process context
 	event.ProcessContext = &event.ProcessCacheEntry.ProcessContext

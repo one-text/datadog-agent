@@ -186,18 +186,20 @@ func (m *Monitor) SendStats() error {
 func (m *Monitor) ProcessEvent(event *model.Event) {
 	m.loadController.Count(event)
 
-	// Look for an unresolved path
-	if err := event.PathResolutionError; err != nil {
-		var notCritical *path.ErrPathResolutionNotCritical
-		if !errors.As(err, &notCritical) {
+	// handle event errors
+	if event.Error != nil {
+		var err *path.ErrPathResolution
+		if !errors.As(event.Error, &err) {
 			m.probe.DispatchCustomEvent(
-				NewAbnormalPathEvent(event, m.probe, err),
+				NewAbnormalPathEvent(event, m.probe, event.Error),
 			)
 		}
-	} else {
-		if m.activityDumpManager != nil {
-			m.activityDumpManager.ProcessEvent(event)
-		}
+
+		return
+	}
+
+	if m.activityDumpManager != nil {
+		m.activityDumpManager.ProcessEvent(event)
 	}
 }
 
