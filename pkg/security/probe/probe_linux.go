@@ -857,9 +857,15 @@ func (p *Probe) handleEvent(CPU int, data []byte) {
 	// anomaly detection events
 	if model.IsAnomalyDetectionEvent(event.GetType()) {
 		p.monitor.securityProfileManager.FillProfileContextFromContainerID(event.ProcessContext.ContainerID, &event.SecurityProfileContext)
+
+		tags := p.GetEventTags(event)
+		if service := p.GetService(event); service != "" {
+			tags = append(tags, "service:"+service)
+		}
+
 		p.DispatchCustomEvent(
 			events.NewCustomRule(events.AnomalyDetectionRuleID),
-			events.NewCustomEventLazy(event.GetEventType(), p.EventMarshallerCtor(event)),
+			events.NewCustomEventLazy(event.GetEventType(), p.EventMarshallerCtor(event), tags...),
 		)
 		p.anomalyDetectionSent[event.GetEventType()].Inc()
 	}
