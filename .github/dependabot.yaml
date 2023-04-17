@@ -35,6 +35,22 @@ updates:
       interval: weekly
     open-pull-requests-limit: 100
   - package-ecosystem: gomod
+    directory: /pkg/gohai
+    labels:
+      - dependencies
+      - dependencies-go
+      - team/agent-shared-components
+      - changelog/no-changelog
+    milestone: 22
+    ignore:
+      # Ignore internal modules
+      - dependency-name: github.com/DataDog/datadog-agent/*
+      # See https://github.com/DataDog/datadog-agent/pull/10112
+      - dependency-name: github.com/mailru/easyjson
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 100
+  - package-ecosystem: gomod
     directory: /pkg/trace
     labels:
       - dependencies
@@ -86,9 +102,9 @@ updates:
       - dependencies
       - dependencies-go
       - dependencies-go-tools # This makes the go_mod_tidy Github Action not run go tools from this
-                              # package on Dependabot PRs. Otherwise, a malicious dependency could
-                              # publish a new version exploiting that it runs automatically after it
-                              # is updated to write to our repo.
+        # package on Dependabot PRs. Otherwise, a malicious dependency could
+        # publish a new version exploiting that it runs automatically after it
+        # is updated to write to our repo.
       - dev/tooling
       - team/agent-platform
       - changelog/no-changelog
