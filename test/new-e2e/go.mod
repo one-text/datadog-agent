@@ -7,7 +7,7 @@ go 1.18
 // TODO: Implement hard check in CI
 
 require (
-	github.com/DataDog/test-infra-definitions v0.0.0-20230413171146-10597f8dcbbf
+	github.com/DataDog/test-infra-definitions v0.0.0-20230417104538-c82a644470b0
 	github.com/aws/aws-sdk-go-v2 v1.17.7
 	github.com/aws/aws-sdk-go-v2/config v1.18.19
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.33.2
@@ -72,7 +72,12 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pulumi/pulumi-aws/sdk/v5 v5.30.0 // indirect
 	github.com/pulumi/pulumi-awsx/sdk v1.0.2 // indirect
+	github.com/pulumi/pulumi-azure-native-sdk v1.95.0 // indirect
+	github.com/pulumi/pulumi-azure-native-sdk/compute v1.95.0 // indirect
+	github.com/pulumi/pulumi-azure-native-sdk/containerservice v1.95.0 // indirect
+	github.com/pulumi/pulumi-azure-native-sdk/network v1.95.0 // indirect
 	github.com/pulumi/pulumi-docker/sdk/v3 v3.6.1 // indirect
+	github.com/pulumi/pulumi-eks/sdk v1.0.1 // indirect
 	github.com/pulumi/pulumi-kubernetes/sdk/v3 v3.24.1 // indirect
 	github.com/pulumi/pulumi-libvirt/sdk v0.4.0 // indirect
 	github.com/pulumi/pulumi-random/sdk/v4 v4.11.2 // indirect
