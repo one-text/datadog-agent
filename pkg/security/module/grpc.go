@@ -18,10 +18,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	processnet "github.com/DataDog/datadog-agent/pkg/process/net"
 	"github.com/DataDog/datadog-agent/pkg/security/seclog"
 	"github.com/DataDog/datadog-agent/pkg/util/filesystem"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	utilnet "github.com/DataDog/datadog-agent/pkg/util/net"
 )
 
 type GRPCServer struct {
@@ -54,7 +54,7 @@ func (gustc grpcUnixSocketTransportCredential) ServerHandshake(conn net.Conn) (n
 	if !ok {
 		return conn, info{credentials.CommonAuthInfo{SecurityLevel: credentials.NoSecurity}}, nil
 	}
-	valid, err := utilnet.IsUnixNetConnValid(unixConn, gustc.allowedUsrID, gustc.allowedGrpID)
+	valid, err := processnet.IsUnixNetConnValid(unixConn, gustc.allowedUsrID, gustc.allowedGrpID)
 	if err != nil || !valid {
 		if err != nil {
 			log.Errorf("unix socket %s -> %s closing connection, error %s", unixConn.LocalAddr(), unixConn.RemoteAddr(), err)
