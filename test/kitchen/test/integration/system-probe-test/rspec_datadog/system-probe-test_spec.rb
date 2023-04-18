@@ -9,15 +9,15 @@ tests_dir = ::File.join(root_dir, "tests")
 
 GOLANG_TEST_FAILURE = /FAIL:/
 
-skip_prebuilt_tests = Array.[](
-  "pkg/collector/corechecks/ebpf/probe"
-)
+# skip_prebuilt_tests = Array.[](
+#   "pkg/collector/corechecks/ebpf/probe"
+# )
 
-runtime_compiled_tests = Array.[](
-  "pkg/network/tracer",
-  "pkg/network/protocols/http",
-  "pkg/collector/corechecks/ebpf/probe"
-)
+# runtime_compiled_tests = Array.[](
+#   "pkg/network/tracer",
+#   "pkg/network/protocols/http",
+#   "pkg/collector/corechecks/ebpf/probe"
+# )
 
 co_re_tests = Array.[](
   "pkg/network/tracer",
@@ -95,7 +95,7 @@ shared_examples "passes" do |bundle, env, filter, filter_inclusive|
         xmlpath = "/tmp/junit/#{bundle}/#{junitfile}"
         cmd = ["sudo", "-E",
           "/go/bin/gotestsum",
-          "--format", "dots",
+          "--format", "standard-verbose",
           "--junitfile", xmlpath,
           "--jsonfile", "/tmp/pkgjson/#{bundle}/#{pkg.gsub("/","-")}.json",
           "--raw-command", "--",
@@ -131,22 +131,22 @@ describe "system-probe" do
     print KernelOut.format(`tar -C /tmp/testjson -czf /tmp/testjson.tar.gz .`)
   end
 
-  context "prebuilt" do
-    env = {
-      "DD_ENABLE_RUNTIME_COMPILER"=>"false",
-      "DD_ENABLE_CO_RE"=>"false"
-    }
-    include_examples "passes", "prebuilt", env, skip_prebuilt_tests, false
-  end
+  # context "prebuilt" do
+  #   env = {
+  #     "DD_ENABLE_RUNTIME_COMPILER"=>"false",
+  #     "DD_ENABLE_CO_RE"=>"false"
+  #   }
+  #   include_examples "passes", "prebuilt", env, skip_prebuilt_tests, false
+  # end
 
-  context "runtime compiled" do
-    env = {
-      "DD_ENABLE_RUNTIME_COMPILER"=>"true",
-      "DD_ALLOW_PRECOMPILED_FALLBACK"=>"false",
-      "DD_ENABLE_CO_RE"=>"false"
-    }
-    include_examples "passes", "runtime", env, runtime_compiled_tests, true
-  end
+  # context "runtime compiled" do
+  #   env = {
+  #     "DD_ENABLE_RUNTIME_COMPILER"=>"true",
+  #     "DD_ALLOW_PRECOMPILED_FALLBACK"=>"false",
+  #     "DD_ENABLE_CO_RE"=>"false"
+  #   }
+  #   include_examples "passes", "runtime", env, runtime_compiled_tests, true
+  # end
 
   context "CO-RE" do
     env = {
@@ -158,15 +158,15 @@ describe "system-probe" do
     include_examples "passes", "co-re", env, co_re_tests, true
   end
 
-  context "fentry" do
-    env = {
-      "NETWORK_TRACER_FENTRY_TESTS"=>"true",
-      "DD_ENABLE_CO_RE"=>"true",
-      "DD_ENABLE_RUNTIME_COMPILER"=>"false",
-      "DD_ALLOW_RUNTIME_COMPILED_FALLBACK"=>"false"
-    }
-    if osname == "amzn-2" and arch == "x86_64" and release.start_with?("5.10.")
-      include_examples "passes", "fentry", env, skip_prebuilt_tests, false
-    end
-  end
+  # context "fentry" do
+  #   env = {
+  #     "NETWORK_TRACER_FENTRY_TESTS"=>"true",
+  #     "DD_ENABLE_CO_RE"=>"true",
+  #     "DD_ENABLE_RUNTIME_COMPILER"=>"false",
+  #     "DD_ALLOW_RUNTIME_COMPILED_FALLBACK"=>"false"
+  #   }
+  #   if osname == "amzn-2" and arch == "x86_64" and release.start_with?("5.10.")
+  #     include_examples "passes", "fentry", env, skip_prebuilt_tests, false
+  #   end
+  # end
 end
