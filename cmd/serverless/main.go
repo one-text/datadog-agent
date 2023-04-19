@@ -219,6 +219,14 @@ func runAgent(stopCh chan struct{}) (serverlessDaemon *daemon.Daemon, err error)
 	serverlessDaemon.SetStatsdServer(metricAgent)
 	serverlessDaemon.SetupLogCollectionHandler(logsAPICollectionRoute, logChannel, config.Datadog.GetBool("serverless.logs_enabled"), config.Datadog.GetBool("enhanced_metrics"), initDurationChan)
 
+	coldStartSpanCreator := &trace.ColdStartSpanCreator{
+		LambdaSpanChan:   lambdaSpanChan,
+		InitDurationChan: initDurationChan,
+		TraceAgent:       serverlessDaemon.TraceAgent,
+		StopChan:         make(chan struct{}),
+		ColdStartSpanId:  coldStartSpanId,
+	}
+
 	// Concurrently start heavyweight features
 	var wg sync.WaitGroup
 
@@ -227,7 +235,7 @@ func runAgent(stopCh chan struct{}) (serverlessDaemon *daemon.Daemon, err error)
 	go func() {
 		defer wg.Done()
 		traceAgent := &trace.ServerlessTraceAgent{}
-		traceAgent.Start(config.Datadog.GetBool("apm_config.enabled"), &trace.LoadConfig{Path: datadogConfigPath}, lambdaSpanChan, coldStartSpanId)
+		traceAgent.Start(config.Datadog.GetBool("apm_config.enabled"), &trace.LoadConfig{Path: datadogConfigPath}, coldStartSpanId, coldStartSpanCreator)
 		serverlessDaemon.SetTraceAgent(traceAgent)
 	}()
 
@@ -294,14 +302,6 @@ func runAgent(stopCh chan struct{}) (serverlessDaemon *daemon.Daemon, err error)
 	}()
 
 	wg.Wait()
-
-	coldStartSpanCreator := &trace.ColdStartSpanCreator{
-		LambdaSpanChan:   lambdaSpanChan,
-		InitDurationChan: initDurationChan,
-		TraceAgent:       serverlessDaemon.TraceAgent,
-		StopChan:         make(chan struct{}),
-		ColdStartSpanId:  coldStartSpanId,
-	}
 
 	log.Debug("Starting ColdStartSpanCreator")
 	coldStartSpanCreator.Run()
