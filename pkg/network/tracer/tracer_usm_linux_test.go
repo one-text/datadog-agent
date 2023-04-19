@@ -828,12 +828,19 @@ func TestJavaInjection(t *testing.T) {
 				log.SetupLogger(seelog.Default, "debug")
 				cfg.JavaDir = legacyJavaDir
 				cfg.SSLAsyncHandshakeWindow = 50000000
+
+				nettestutil.StartEBPFTrace()
+				cfg.BPFDebug = true
+
 			},
 			postTracerSetup: func(t *testing.T, ctx testContext) {
 				javatestutil.RunJavaVersion(t, "openjdk:15-oraclelinux8", "-cp /v/netty/target/dependency/*:/v/netty/target/NettyClient-1.jar -Dio.netty.native.deleteLibAfterLoading=false com.datadoghq.NettyClient sslengine=openssl_refcnt", regexp.MustCompile("END OF CONTENT"))
 			},
 			validation: func(t *testing.T, ctx testContext, tr *Tracer) {
 				// Iterate through active connections until we find connection created above
+				t.Cleanup(func() {
+					t.Log(nettestutil.StopEBPFTrace())
+				})
 				require.Eventuallyf(t, func() bool {
 					payload := getConnections(t, tr)
 					for key := range payload.HTTP {
