@@ -512,7 +512,9 @@ func (k *KSMCheck) processMetrics(sender aggregator.Sender, metrics map[string][
 			if transform, found := k.metricTransformers[metricFamily.Name]; found {
 				lMapperOverride := labelsMapperOverride(metricFamily.Name)
 				for _, m := range metricFamily.ListMetrics {
+					log.Debugf("metricFamily.Name=%s, m=%+v", metricFamily.Name, m)
 					hostname, tags := k.hostnameAndTags(m.Labels, labelJoiner, lMapperOverride)
+					log.Debugf("metricFamily.Name=%s, hostname=%s, tags=%+v", metricFamily.Name, hostname, tags)
 					transform(sender, metricFamily.Name, m, hostname, tags, now)
 				}
 				continue
@@ -520,7 +522,9 @@ func (k *KSMCheck) processMetrics(sender aggregator.Sender, metrics map[string][
 			if ddname, found := k.metricNamesMapper[metricFamily.Name]; found {
 				lMapperOverride := labelsMapperOverride(metricFamily.Name)
 				for _, m := range metricFamily.ListMetrics {
+					log.Debugf("metricFamily.Name=%s, m=%+v", metricFamily.Name, m)
 					hostname, tags := k.hostnameAndTags(m.Labels, labelJoiner, lMapperOverride)
+					log.Debugf("metricFamily.Name=%s, hostname=%s, tags=%+v", metricFamily.Name, hostname, tags)
 					sender.Gauge(ksmMetricPrefix+ddname, m.Val, hostname, tags)
 				}
 				continue
