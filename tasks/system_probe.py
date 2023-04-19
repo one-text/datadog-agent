@@ -525,6 +525,7 @@ def test(
     windows=is_windows,
     failfast=False,
     kernel_release=None,
+    strip_object_files=False,
 ):
     """
     Run tests on eBPF parts
@@ -548,6 +549,7 @@ def test(
             ctx,
             windows=windows,
             kernel_release=kernel_release,
+            strip_object_files=strip_object_files,
         )
 
     build_tags = [NPM_TAG]
@@ -600,7 +602,7 @@ def chdir(dirname=None):
 
 
 @task
-def kitchen_prepare(ctx, windows=is_windows, kernel_release=None, ci=False):
+def kitchen_prepare(ctx, windows=is_windows, kernel_release=None, ci=False, strip_object_files=False):
     """
     Compile test suite for kitchen
     """
@@ -647,6 +649,7 @@ def kitchen_prepare(ctx, windows=is_windows, kernel_release=None, ci=False):
             bundle_ebpf=False,
             output_path=os.path.join(target_path, target_bin),
             kernel_release=kernel_release,
+            strip_object_files=strip_object_files,
         )
 
         # copy ancillary data, if applicable
@@ -1198,8 +1201,8 @@ def build_cws_object_files(
 
 
 @task
-def object_files(ctx, kernel_release=None, with_unit_test=False):
-    build_object_files(ctx, kernel_release=kernel_release, with_unit_test=with_unit_test)
+def object_files(ctx, kernel_release=None, with_unit_test=False, strip=False):
+    build_object_files(ctx, kernel_release=kernel_release, with_unit_test=with_unit_test, strip_object_files=strip)
 
 
 def clean_object_files(
