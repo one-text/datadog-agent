@@ -512,9 +512,8 @@ func (k *KSMCheck) processMetrics(sender aggregator.Sender, metrics map[string][
 			if transform, found := k.metricTransformers[metricFamily.Name]; found {
 				lMapperOverride := labelsMapperOverride(metricFamily.Name)
 				for _, m := range metricFamily.ListMetrics {
-					log.Debugf("metricFamily.Name=%s, m=%+v", metricFamily.Name, m)
 					hostname, tags := k.hostnameAndTags(m.Labels, labelJoiner, lMapperOverride)
-					log.Debugf("metricFamily.Name=%s, hostname=%s, tags=%+v", metricFamily.Name, hostname, tags)
+					log.Debugf("metricTransformers looks up transform=%+v by metricFamily.Name=%s | hostname=%s, tags=%+v, m=%+v", transform, metricFamily.Name, hostname, tags, m)
 					transform(sender, metricFamily.Name, m, hostname, tags, now)
 				}
 				continue
@@ -522,9 +521,8 @@ func (k *KSMCheck) processMetrics(sender aggregator.Sender, metrics map[string][
 			if ddname, found := k.metricNamesMapper[metricFamily.Name]; found {
 				lMapperOverride := labelsMapperOverride(metricFamily.Name)
 				for _, m := range metricFamily.ListMetrics {
-					log.Debugf("metricFamily.Name=%s, m=%+v", metricFamily.Name, m)
 					hostname, tags := k.hostnameAndTags(m.Labels, labelJoiner, lMapperOverride)
-					log.Debugf("metricFamily.Name=%s, hostname=%s, tags=%+v", metricFamily.Name, hostname, tags)
+					log.Debugf("metricNamesMapper looks up ddname=%s by metricFamily.Name=%s | ksmMetricPrefix+ddname=%s, hostname=%s, tags=%+v, m=%+v", ksmMetricPrefix+ddname, ddname, metricFamily.Name, hostname, tags, m)
 					sender.Gauge(ksmMetricPrefix+ddname, m.Val, hostname, tags)
 				}
 				continue
@@ -554,6 +552,7 @@ func (k *KSMCheck) hostnameAndTags(labels map[string]string, labelJoiner *labelJ
 	hostname := ""
 
 	labelsToAdd := labelJoiner.getLabelsToAdd(labels)
+	log.Debugf("labels=%+v, labelJoiner=%+v, lMapperOverride=%+v", labels, labelJoiner, lMapperOverride)
 
 	// generate a dedicated tags slice
 	tags := make([]string, 0, len(labels)+len(labelsToAdd))
