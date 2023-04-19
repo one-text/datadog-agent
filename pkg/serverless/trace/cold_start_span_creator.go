@@ -44,9 +44,9 @@ type ColdStartSpanCreator struct {
 	StopChan              chan struct{}
 }
 
-func (c *ColdStartSpanCreator) Filter(span *pb.Span) {
+func (c *ColdStartSpanCreator) Filter(span pb.Span) {
 	if span.Service == "aws.lambda" {
-		c.LambdaSpanChan <- span
+		c.LambdaSpanChan <- &span
 	}
 }
 

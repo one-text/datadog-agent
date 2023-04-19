@@ -22,7 +22,7 @@ type spanModifier struct {
 }
 
 type SpanFilter interface {
-	Filter(*pb.Span)
+	Filter(pb.Span)
 }
 
 // ModifySpan applies extra logic to the given span
@@ -50,6 +50,8 @@ func (s *spanModifier) ModifySpan(_ *pb.TraceChunk, span *pb.Span) {
 	}
 
 	for _, filter := range s.filters {
-		filter.Filter(span)
+		// pass the actual span rather than its pointer to enforce the
+		// requirement that filters do not modify spans
+		filter.Filter(*span)
 	}
 }
