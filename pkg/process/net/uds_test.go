@@ -134,7 +134,16 @@ func lookupUser(t *testing.T, name string) (usrID int, grpID int, usrIDstr strin
 	return usrID, grpID, usr.Username, grp.Name
 }
 
+func checkIfSudoExist(t *testing.T) {
+	err := exec.Command("sudo", "id").Run()
+	if err != nil {
+		t.Skipf("sudo is not installed %s", err)
+	}
+}
+
 func TestHttpServe(t *testing.T) {
+	checkIfSudoExist(t)
+
 	uid, gid, uidStr, gidStr := lookupUser(t, "nobody")
 
 	t.Run("root always valid", func(t *testing.T) {
