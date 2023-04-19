@@ -61,6 +61,8 @@ osr = Hash[*CSV.read("/etc/os-release", col_sep: "=").flatten(1)]
 platform = Gem::Platform.local.os
 osname = "#{osr["ID"]}-#{osr["VERSION_ID"]}"
 
+print KernelOut.format(`ls -al "#{tests_dir}/pkg/ebpf/bytecode/build/co-re/*.o"`)
+
 ##
 ## The main chef recipe (test\kitchen\site-cookbooks\dd-system-probe-check\recipes\default.rb)
 ## copies the necessary files (including the precompiled object files), and sets the mode to
@@ -153,7 +155,8 @@ describe "system-probe" do
       "DD_ENABLE_CO_RE"=>"true",
       "DD_ENABLE_RUNTIME_COMPILER"=>"false",
       "DD_ALLOW_RUNTIME_COMPILED_FALLBACK"=>"false",
-      "DD_ALLOW_PRECOMPILED_FALLBACK"=>"false"
+      "DD_ALLOW_PRECOMPILED_FALLBACK"=>"false",
+      "DD_LOG_LEVEL"=>"trace"
     }
     include_examples "passes", "co-re", env, co_re_tests, true
   end
