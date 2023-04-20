@@ -352,7 +352,7 @@ func (m *SecurityProfileManager) OnNewProfileEvent(selector cgroupModel.Workload
 	profile.loadedInKernel = false
 
 	// decode the content of the profile
-	protoToSecurityProfile(profile, newProfile)
+	ProtoToSecurityProfile(profile, newProfile)
 
 	// prepare the profile for insertion
 	m.prepareProfile(profile)

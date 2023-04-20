@@ -51,10 +51,12 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/probe"
 	sprobe "github.com/DataDog/datadog-agent/pkg/security/probe"
 	"github.com/DataDog/datadog-agent/pkg/security/proto/api"
+	cgroupModel "github.com/DataDog/datadog-agent/pkg/security/resolvers/cgroup/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/compiler/eval"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/rules"
 	"github.com/DataDog/datadog-agent/pkg/security/security_profile/dump"
+	"github.com/DataDog/datadog-agent/pkg/security/security_profile/profile"
 	"github.com/DataDog/datadog-agent/pkg/security/serializers"
 	"github.com/DataDog/datadog-agent/pkg/security/utils"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -131,6 +133,12 @@ runtime_security_config:
       formats: {{range .ActivityDumpLocalStorageFormats}}
       - {{.}}
       {{end}}
+{{end}}
+  security_profile:
+    enabled: {{ .EnableSecurityProfile }}
+{{if .EnableSecurityProfile}}
+    dir: {{ .SecurityProfileDir }}
+    watch_dir: {{ .SecurityProfileWatchDir }}
 {{end}}
 
   self_test:
@@ -214,6 +222,9 @@ type testOpts struct {
 	activityDumpLocalStorageDirectory   string
 	activityDumpLocalStorageCompression bool
 	activityDumpLocalStorageFormats     []string
+	enableSecurityProfile               bool
+	securityProfileDir                  string
+	securityProfileWatchDir             bool
 	disableDiscarders                   bool
 	eventsCountThreshold                int
 	disableERPCDentryResolution         bool
@@ -246,6 +257,9 @@ func (to testOpts) Equal(opts testOpts) bool {
 		to.activityDumpLocalStorageDirectory == opts.activityDumpLocalStorageDirectory &&
 		to.activityDumpLocalStorageCompression == opts.activityDumpLocalStorageCompression &&
 		reflect.DeepEqual(to.activityDumpLocalStorageFormats, opts.activityDumpLocalStorageFormats) &&
+		to.enableSecurityProfile == opts.enableSecurityProfile &&
+		to.securityProfileDir == opts.securityProfileDir &&
+		to.securityProfileWatchDir == opts.securityProfileWatchDir &&
 		to.disableDiscarders == opts.disableDiscarders &&
 		to.disableFilters == opts.disableFilters &&
 		to.eventsCountThreshold == opts.eventsCountThreshold &&
@@ -693,6 +707,10 @@ func genTestConfigs(dir string, opts testOpts, testDir string) (*emconfig.Config
 		opts.activityDumpLocalStorageDirectory = "/tmp/activity_dumps"
 	}
 
+	if opts.securityProfileDir == "" {
+		opts.securityProfileDir = "/tmp/activity_dumps/profiles"
+	}
+
 	erpcDentryResolutionEnabled := true
 	if opts.disableERPCDentryResolution {
 		erpcDentryResolutionEnabled = false
@@ -722,6 +740,9 @@ func genTestConfigs(dir string, opts testOpts, testDir string) (*emconfig.Config
 		"ActivityDumpLocalStorageDirectory":   opts.activityDumpLocalStorageDirectory,
 		"ActivityDumpLocalStorageCompression": opts.activityDumpLocalStorageCompression,
 		"ActivityDumpLocalStorageFormats":     opts.activityDumpLocalStorageFormats,
+		"EnableSecurityProfile":               opts.enableSecurityProfile,
+		"SecurityProfileDir":                  opts.securityProfileDir,
+		"SecurityProfileWatchDir":             opts.securityProfileWatchDir,
 		"EventsCountThreshold":                opts.eventsCountThreshold,
 		"ErpcDentryResolutionEnabled":         erpcDentryResolutionEnabled,
 		"MapDentryResolutionEnabled":          mapDentryResolutionEnabled,
@@ -868,6 +889,7 @@ func newTestModule(t testing.TB, macroDefs []*rules.MacroDefinition, ruleDefs []
 		ProbeOpts: probe.Opts{
 			StatsdClient:       statsdClient,
 			DontDiscardRuntime: true,
+			CustomTagsResolver: NewFakeResolver(),
 		},
 	}
 
@@ -1758,7 +1780,24 @@ func (tm *testModule) DecodeActivityDump(path string) (*dump.ActivityDump, error
 	return ad, nil
 }
 
+func DecodeSecurityProfile(path string) (*profile.SecurityProfile, error) {
+	protoProfile, err := profile.ParseProfile(path)
+	if err != nil {
+		return nil, err
+	} else if protoProfile == nil {
+		return nil, errors.New("Profile parsing error")
+	}
+
+	newProfile := profile.NewSecurityProfile(cgroupModel.WorkloadSelector{})
+	if newProfile == nil {
+		return nil, errors.New("Profile creation")
+	}
+	profile.ProtoToSecurityProfile(newProfile, protoProfile)
+	return newProfile, nil
+}
+
 func (tm *testModule) StartADocker() (*dockerCmdWrapper, error) {
+	// we use alpine to use nslookup on some tests, and validate all busybox specificities
 	docker, err := newDockerCmdWrapper(tm.st.Root(), tm.st.Root(), "alpine")
 	if err != nil {
 		return nil, err

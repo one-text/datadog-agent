@@ -9,6 +9,7 @@
 package probe
 
 import (
+	"github.com/DataDog/datadog-agent/pkg/security/resolvers/tags"
 	"github.com/DataDog/datadog-go/v5/statsd"
 )
 
@@ -18,10 +19,13 @@ type Opts struct {
 	DontDiscardRuntime bool
 	// StatsdClient to be used for probe stats
 	StatsdClient statsd.ClientInterface
+	// CustomTagsResolver will override the default one. Mainly here for tests.
+	CustomTagsResolver tags.Resolver
 }
 
 func (o *Opts) normalize() {
 	if o.StatsdClient == nil {
 		o.StatsdClient = &statsd.NoOpClient{}
+
 	}
 }

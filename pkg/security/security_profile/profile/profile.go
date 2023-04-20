@@ -84,14 +84,14 @@ func (p *SecurityProfile) generateKernelSecurityProfileDefinition() [16]byte {
 }
 
 type ProcessActivityNodeAndParent struct {
-	node   *dump.ProcessActivityNode
-	parent *ProcessActivityNodeAndParent
+	Node   *dump.ProcessActivityNode
+	Parent *ProcessActivityNodeAndParent
 }
 
 func NewProcessActivityNodeAndParent(node *dump.ProcessActivityNode, parent *ProcessActivityNodeAndParent) *ProcessActivityNodeAndParent {
 	return &ProcessActivityNodeAndParent{
-		node:   node,
-		parent: parent,
+		Node:   node,
+		Parent: parent,
 	}
 }
 
@@ -112,10 +112,10 @@ func ProcessActivityTreeWalk(processActivityTree []*dump.ProcessActivityNode,
 
 	for node != nil {
 		if walkFunc(node) {
-			result = append(result, node.node)
+			result = append(result, node.Node)
 		}
 
-		for _, child := range node.node.Children {
+		for _, child := range node.Node.Children {
 			nodes = append(nodes, NewProcessActivityNodeAndParent(child, node))
 		}
 		if len(nodes) > 0 {
@@ -139,17 +139,17 @@ func (p *SecurityProfile) findProfileProcessNodes(pc *model.ProcessContext) []*d
 	}
 	return ProcessActivityTreeWalk(p.ProcessActivityTree, func(node *ProcessActivityNodeAndParent) bool {
 		// check process
-		if !node.node.Matches(&pc.Process, false) {
+		if !node.Node.Matches(&pc.Process, false) {
 			return false
 		}
 		// check parent
-		if node.parent == nil && parent == nil {
+		if node.Parent == nil && parent == nil {
 			return true
 		}
-		if node.parent == nil || parent == nil {
+		if node.Parent == nil || parent == nil {
 			return false
 		}
-		return node.parent.node.Matches(&parent.Process, false)
+		return node.Parent.Node.Matches(&parent.Process, false)
 	})
 }
 
