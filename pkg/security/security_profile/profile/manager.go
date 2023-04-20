@@ -550,7 +550,7 @@ func (m *SecurityProfileManager) LookupEventOnProfiles(event *model.Event) {
 		event.AddToFlags(model.EventFlagsSecurityProfileInProfile)
 
 	case model.DNSEventType:
-		if findDNSInNodes(processNodes, event) {
+		if findDNSInNodes(processNodes, event, m.config.RuntimeSecurity.SecurityProfileDNSMatchMaxDepth) {
 			event.AddToFlags(model.EventFlagsSecurityProfileInProfile)
 		}
 	}

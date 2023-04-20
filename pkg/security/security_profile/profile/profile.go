@@ -9,6 +9,7 @@
 package profile
 
 import (
+	"strings"
 	"sync"
 
 	cgroupModel "github.com/DataDog/datadog-agent/pkg/security/resolvers/cgroup/model"
@@ -153,15 +154,49 @@ func (p *SecurityProfile) findProfileProcessNodes(pc *model.ProcessContext) []*d
 	})
 }
 
-func findDNSInNodes(nodes []*dump.ProcessActivityNode, event *model.Event) bool {
-	for _, node := range nodes {
-		dnsNode, ok := node.DNSNames[event.DNS.Name]
-		if !ok {
-			continue
+func dnsFilterSubdomains(name string, maxDepth int) string {
+	tab := strings.Split(name, ".")
+	if len(tab) < maxDepth {
+		return name
+	}
+	result := ""
+	for i := 0; i < maxDepth; i++ {
+		if result != "" {
+			result = "." + result
 		}
-		for _, req := range dnsNode.Requests {
-			if req.Type == event.DNS.Type {
-				return true
+		result = tab[len(tab)-i-1] + result
+	}
+	return result
+}
+
+func findDNSInNodes(nodes []*dump.ProcessActivityNode, event *model.Event, maxDepth int) bool {
+	var evtDnsName string
+	if maxDepth == 0 {
+		evtDnsName = event.DNS.Name
+	} else {
+		evtDnsName = dnsFilterSubdomains(event.DNS.Name, maxDepth)
+	}
+
+	for _, node := range nodes {
+		if maxDepth == 0 {
+			dnsNode, ok := node.DNSNames[event.DNS.Name]
+			if !ok {
+				continue
+			}
+			for _, req := range dnsNode.Requests {
+				if req.Type == event.DNS.Type {
+					return true
+				}
+			}
+		} else {
+			for name, dnsNode := range node.DNSNames {
+				if dnsFilterSubdomains(name, maxDepth) == evtDnsName {
+					for _, req := range dnsNode.Requests {
+						if req.Type == event.DNS.Type {
+							return true
+						}
+					}
+				}
 			}
 		}
 	}
