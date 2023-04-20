@@ -64,7 +64,7 @@ func TestServerlessOTLPAgentReceivesTraces(t *testing.T) {
 	assert.True(metricAgent.IsReady())
 
 	// setup otlp agent
-	otlpAgent := NewServerlessOTLPAgent(metricAgent.Demux.Serializer())
+	otlpAgent := NewServerlessOTLPAgent(nil, metricAgent.Demux.Serializer())
 	otlpAgent.Start()
 	defer otlpAgent.Stop()
 	assert.NotNil(otlpAgent.pipeline)
@@ -72,7 +72,7 @@ func TestServerlessOTLPAgentReceivesTraces(t *testing.T) {
 
 	// setup trace agent
 	traceAgent := &trace.ServerlessTraceAgent{}
-	traceAgent.Start(true, &trace.LoadConfig{Path: "./testdata/valid.yml"}, nil, 0)
+	traceAgent.Start(true, &trace.LoadConfig{Path: "./testdata/valid.yml"}, 0)
 	defer traceAgent.Stop()
 	assert.NotNil(traceAgent.Get())
 	traceChan := make(chan struct{})

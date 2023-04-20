@@ -74,7 +74,7 @@ def normalize_logs(stage):
 def normalize_traces(stage):
     def trace_sort_key(log):
         name = log['chunks'][0]['spans'][0]['name']
-        cold_start = log['chunks'][0]['spans'][0]['meta'].get('cold_start')
+        cold_start = log['chunks'][0]['spans'][0]['meta'].get('cold_start', '')
         return name, cold_start
 
     return [

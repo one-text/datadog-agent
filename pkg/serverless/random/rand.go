@@ -10,9 +10,11 @@ import (
 	"math"
 	"math/big"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/serverless/tags"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
@@ -53,4 +55,25 @@ func (rs *safeSource) Seed(seed int64) {
 	rs.Lock()
 	rs.source.Seed(seed)
 	rs.Unlock()
+}
+
+// GenerateSpanId creates a secure random span id in specific scenarios,
+// otherwise return a pseudo random id
+func GenerateSpanId() uint64 {
+	isSnapStart := os.Getenv(tags.InitType) == tags.SnapStartValue
+	if isSnapStart {
+		max := new(big.Int).SetUint64(math.MaxUint64)
+		if randId, err := cryptorand.Int(cryptorand.Reader, max); err != nil {
+			log.Debugf("Failed to generate a secure random span id: %v", err)
+		} else {
+			return randId.Uint64()
+		}
+	}
+	return Random.Uint64()
+}
+
+// GenerateTraceId creates a secure random trace id in specific scenarios,
+// otherwise return a pseudo random id
+func GenerateTraceId() uint64 {
+	return GenerateSpanId()
 }

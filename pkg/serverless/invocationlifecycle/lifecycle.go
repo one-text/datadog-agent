@@ -16,6 +16,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
 	serverlessLog "github.com/DataDog/datadog-agent/pkg/serverless/logs"
 	serverlessMetrics "github.com/DataDog/datadog-agent/pkg/serverless/metrics"
+	"github.com/DataDog/datadog-agent/pkg/serverless/random"
 	"github.com/DataDog/datadog-agent/pkg/serverless/trace/inferredspan"
 	"github.com/DataDog/datadog-agent/pkg/serverless/trigger"
 	"github.com/DataDog/datadog-agent/pkg/trace/api"
@@ -32,6 +33,7 @@ type LifecycleProcessor struct {
 	DetectLambdaLibrary  func() bool
 	InferredSpansEnabled bool
 	SubProcessor         InvocationSubProcessor
+	OTLPEnabled          bool
 
 	requestHandler *RequestHandler
 }
@@ -216,7 +218,11 @@ func (lp *LifecycleProcessor) OnInvokeEnd(endDetails *InvocationEndDetails) {
 			endDetails.IsError = true
 		}
 
-		endExecutionSpan(lp.GetExecutionInfo(), lp.requestHandler.triggerTags, lp.requestHandler.triggerMetrics, lp.ProcessTrace, endDetails)
+		if !lp.OTLPEnabled {
+			endExecutionSpan(lp.GetExecutionInfo(), lp.requestHandler.triggerTags, lp.requestHandler.triggerMetrics, lp.ProcessTrace, endDetails)
+		} else {
+			log.Debug("skipping aws.lambda span creation for universal instrumentation")
+		}
 
 		if lp.InferredSpansEnabled {
 			log.Debug("[lifecycle] Attempting to complete the inferred span")
@@ -279,7 +285,7 @@ func (lp *LifecycleProcessor) newRequest(lambdaPayloadString []byte, startTime t
 	lp.requestHandler.inferredSpans[0] = &inferredspan.InferredSpan{
 		CurrentInvocationStartTime: startTime,
 		Span: &pb.Span{
-			SpanID: inferredspan.GenerateSpanId(),
+			SpanID: random.GenerateSpanId(),
 		},
 	}
 	lp.requestHandler.triggerTags = make(map[string]string)

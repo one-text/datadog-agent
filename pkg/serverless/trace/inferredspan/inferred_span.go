@@ -6,10 +6,6 @@
 package inferredspan
 
 import (
-	"crypto/rand"
-	"math"
-	"math/big"
-	"os"
 	"strings"
 	"time"
 
@@ -137,27 +133,13 @@ func (inferredSpan *InferredSpan) CompleteInferredSpan(
 	})
 }
 
-// GenerateSpanId creates a secure random span id in specific scenarios, otherwise return a pseudo random id
-func GenerateSpanId() uint64 {
-	isSnapStart := os.Getenv(tags.InitType) == tags.SnapStartValue
-	if isSnapStart {
-		max := new(big.Int).SetUint64(math.MaxUint64)
-		if randId, err := rand.Int(rand.Reader, max); err != nil {
-			log.Debugf("Failed to generate a secure random span id: %v", err)
-		} else {
-			return randId.Uint64()
-		}
-	}
-	return random.Random.Uint64()
-}
-
 // generateInferredSpan declares and initializes a new inferred span
 // with the SpanID and TraceID
 func (inferredSpan *InferredSpan) generateInferredSpan(startTime time.Time) {
 
 	inferredSpan.CurrentInvocationStartTime = startTime
 	inferredSpan.Span = &pb.Span{
-		SpanID: GenerateSpanId(),
+		SpanID: random.GenerateSpanId(),
 	}
 	log.Debugf("Generated new Inferred span: %+v", inferredSpan)
 }

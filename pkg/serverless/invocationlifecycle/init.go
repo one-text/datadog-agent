@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DataDog/datadog-agent/pkg/serverless/random"
 	"github.com/DataDog/datadog-agent/pkg/serverless/trace/inferredspan"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -148,7 +149,7 @@ func (lp *LifecycleProcessor) initFromSQSEvent(event events.SQSEvent) {
 	lp.requestHandler.inferredSpans[1] = &inferredspan.InferredSpan{
 		CurrentInvocationStartTime: time.Unix(lp.requestHandler.inferredSpans[0].Span.Start, 0),
 		Span: &pb.Span{
-			SpanID: inferredspan.GenerateSpanId(),
+			SpanID: random.GenerateSpanId(),
 		},
 	}
 
