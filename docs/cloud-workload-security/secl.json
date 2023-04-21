@@ -1121,6 +1121,11 @@
           "name": "process.user",
           "definition": "User of the process",
           "property_doc_link": "common-credentials-user-doc"
+        },
+        {
+          "name": "timestamp",
+          "definition": "Timestamp of the event",
+          "property_doc_link": "timestamp-doc"
         }
       ]
     },
@@ -8762,6 +8767,18 @@
       ],
       "constants": "Pipe buffer flags",
       "constants_link": "pipe-buffer-flags",
+      "examples": []
+    },
+    {
+      "name": "timestamp",
+      "link": "timestamp-doc",
+      "type": "int",
+      "definition": "Timestamp of the event",
+      "prefixes": [
+        ""
+      ],
+      "constants": "",
+      "constants_link": "",
       "examples": []
     },
     {

@@ -203,8 +203,8 @@ type Event struct {
 	Type         uint32         `field:"-"`
 	Flags        uint32         `field:"-"`
 	Async        bool           `field:"async,handler:ResolveAsync" event:"*" platform:"linux"` // SECLDoc[async] Definition:`True if the syscall was asynchronous`
-	TimestampRaw uint64         `field:"-" json:"-"`
-	Timestamp    time.Time      `field:"-"` // Timestamp of the event
+	TimestampRaw uint64         `field:"timestamp,handler:ResolveEventTimestamp" json:"-"`      // SECLDoc[timestamp] Definition:`Timestamp of the event`
+	Timestamp    time.Time      `field:"-"`
 	Rules        []*MatchedRule `field:"-"`
 
 	// context shared with all events
@@ -390,9 +390,9 @@ func (ev *Event) ResolveProcessCacheEntry() (*ProcessCacheEntry, bool) {
 	return ev.FieldHandlers.ResolveProcessCacheEntry(ev)
 }
 
-// ResolveEventTimestamp uses the field handler
-func (ev *Event) ResolveEventTimestamp() time.Time {
-	return ev.FieldHandlers.ResolveEventTimestamp(ev)
+// ResolveEventTime uses the field handler
+func (ev *Event) ResolveEventTime() time.Time {
+	return ev.FieldHandlers.ResolveEventTime(ev)
 }
 
 // GetProcessServiceTag uses the field handler
@@ -1190,7 +1190,7 @@ func (pl *PathLeaf) MarshalBinary() ([]byte, error) {
 // ExtraFieldHandlers handlers not hold by any field
 type ExtraFieldHandlers interface {
 	ResolveProcessCacheEntry(ev *Event) (*ProcessCacheEntry, bool)
-	ResolveEventTimestamp(ev *Event) time.Time
+	ResolveEventTime(ev *Event) time.Time
 	GetProcessServiceTag(ev *Event) string
 }
 
@@ -1200,7 +1200,7 @@ func (dfh *DefaultFieldHandlers) ResolveProcessCacheEntry(ev *Event) (*ProcessCa
 }
 
 // ResolveEventTimestamp stub implementation
-func (dfh *DefaultFieldHandlers) ResolveEventTimestamp(ev *Event) time.Time {
+func (dfh *DefaultFieldHandlers) ResolveEventTime(ev *Event) time.Time {
 	return ev.Timestamp
 }
 

@@ -1636,7 +1636,7 @@ func (fan *FileActivityNode) enrichFromEvent(event *model.Event) {
 		return
 	}
 	if fan.FirstSeen.IsZero() {
-		fan.FirstSeen = event.FieldHandlers.ResolveEventTimestamp(event)
+		fan.FirstSeen = event.FieldHandlers.ResolveEventTime(event)
 	}
 
 	fan.MatchedRules = model.AppendMatchedRule(fan.MatchedRules, event.Rules)

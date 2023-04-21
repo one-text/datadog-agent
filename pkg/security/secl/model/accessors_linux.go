@@ -14765,6 +14765,15 @@ func (m *Model) GetEvaluator(field eval.Field, regID eval.RegisterID) (eval.Eval
 			Field:  field,
 			Weight: eval.FunctionWeight,
 		}, nil
+	case "timestamp":
+		return &eval.IntEvaluator{
+			EvalFnc: func(ctx *eval.Context) int {
+				ev := ctx.Event.(*Event)
+				return int(ev.FieldHandlers.ResolveEventTimestamp(ev))
+			},
+			Field:  field,
+			Weight: eval.HandlerWeight,
+		}, nil
 	case "unlink.file.change_time":
 		return &eval.IntEvaluator{
 			EvalFnc: func(ctx *eval.Context) int {
@@ -16301,6 +16310,7 @@ func (ev *Event) GetFields() []eval.Field {
 		"splice.pipe_entry_flag",
 		"splice.pipe_exit_flag",
 		"splice.retval",
+		"timestamp",
 		"unlink.file.change_time",
 		"unlink.file.filesystem",
 		"unlink.file.gid",
@@ -20724,6 +20734,8 @@ func (ev *Event) GetFieldValue(field eval.Field) (interface{}, error) {
 		return int(ev.Splice.PipeExitFlag), nil
 	case "splice.retval":
 		return int(ev.Splice.SyscallEvent.Retval), nil
+	case "timestamp":
+		return int(ev.FieldHandlers.ResolveEventTimestamp(ev)), nil
 	case "unlink.file.change_time":
 		return int(ev.Unlink.File.FileFields.CTime), nil
 	case "unlink.file.filesystem":
@@ -23087,6 +23099,8 @@ func (ev *Event) GetFieldEventType(field eval.Field) (eval.EventType, error) {
 		return "splice", nil
 	case "splice.retval":
 		return "splice", nil
+	case "timestamp":
+		return "*", nil
 	case "unlink.file.change_time":
 		return "unlink", nil
 	case "unlink.file.filesystem":
@@ -25449,6 +25463,8 @@ func (ev *Event) GetFieldType(field eval.Field) (reflect.Kind, error) {
 	case "splice.pipe_exit_flag":
 		return reflect.Int, nil
 	case "splice.retval":
+		return reflect.Int, nil
+	case "timestamp":
 		return reflect.Int, nil
 	case "unlink.file.change_time":
 		return reflect.Int, nil
@@ -36873,6 +36889,13 @@ func (ev *Event) SetFieldValue(field eval.Field, value interface{}) error {
 			return &eval.ErrValueTypeMismatch{Field: "Splice.SyscallEvent.Retval"}
 		}
 		ev.Splice.SyscallEvent.Retval = int64(rv)
+		return nil
+	case "timestamp":
+		rv, ok := value.(int)
+		if !ok {
+			return &eval.ErrValueTypeMismatch{Field: "TimestampRaw"}
+		}
+		ev.TimestampRaw = uint64(rv)
 		return nil
 	case "unlink.file.change_time":
 		rv, ok := value.(int)

@@ -166,6 +166,7 @@ func (ev *Event) resolveFields(forADs bool) {
 	if ev.ProcessContext.HasParent() && ev.ProcessContext.Parent.HasInterpreter() {
 		_ = ev.FieldHandlers.ResolveFileFieldsUser(ev, &ev.ProcessContext.Parent.LinuxBinprm.FileEvent.FileFields)
 	}
+	_ = ev.FieldHandlers.ResolveEventTimestamp(ev)
 	// resolve event specific fields
 	switch ev.GetEventType().String() {
 	case "bind":
@@ -771,6 +772,7 @@ type FieldHandlers interface {
 	ResolveContainerCreatedAt(ev *Event, e *ContainerContext) int
 	ResolveContainerID(ev *Event, e *ContainerContext) string
 	ResolveContainerTags(ev *Event, e *ContainerContext) []string
+	ResolveEventTimestamp(ev *Event) int
 	ResolveFileBasename(ev *Event, e *FileEvent) string
 	ResolveFileFieldsGroup(ev *Event, e *FileFields) string
 	ResolveFileFieldsInUpperLayer(ev *Event, e *FileFields) bool
@@ -822,6 +824,7 @@ func (dfh *DefaultFieldHandlers) ResolveContainerID(ev *Event, e *ContainerConte
 func (dfh *DefaultFieldHandlers) ResolveContainerTags(ev *Event, e *ContainerContext) []string {
 	return e.Tags
 }
+func (dfh *DefaultFieldHandlers) ResolveEventTimestamp(ev *Event) int { return int(ev.TimestampRaw) }
 func (dfh *DefaultFieldHandlers) ResolveFileBasename(ev *Event, e *FileEvent) string {
 	return e.BasenameStr
 }
