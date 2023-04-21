@@ -102,7 +102,7 @@ func (p *ProcessConsumer) HandleEvent(event *smodel.Event) {
 		GID:            entry.GID,
 		Username:       entry.User,
 		Group:          entry.Group,
-		Exe:            entry.FileEvent.PathnameStr, // FileEvent is not a pointer, so it can be directly accessed
+		Exe:            entry.Comm,
 		Cmdline:        cmdline,
 		ForkTime:       entry.ForkTime,
 		ExecTime:       entry.ExecTime,

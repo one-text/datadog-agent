@@ -33,7 +33,14 @@ var EventMonitor = module.Factory{
 			return nil, module.ErrNotEnabled
 		}
 
-		evm, err := eventmonitor.NewEventMonitor(emconfig, secconfig, eventmonitor.Opts{})
+		opts := eventmonitor.Opts{}
+
+		// set probe options
+		if secconfig.RuntimeSecurity.IsRuntimeEnabled() {
+			opts.ProbeOpts.PathResolutionEnabled = true
+		}
+
+		evm, err := eventmonitor.NewEventMonitor(emconfig, secconfig, opts)
 		if err != nil {
 			log.Infof("error initializing event monitoring module: %v", err)
 			return nil, module.ErrNotEnabled
