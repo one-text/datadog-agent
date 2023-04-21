@@ -21,6 +21,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	"github.com/DataDog/datadog-agent/pkg/config"
 	"github.com/DataDog/datadog-agent/pkg/serverless/metrics"
 	"github.com/DataDog/datadog-agent/pkg/serverless/trace"
 	"github.com/DataDog/datadog-agent/pkg/trace/pb"
@@ -37,6 +38,7 @@ func TestMain(m *testing.M) {
 	if port, err := testutil.FindTCPPort(); err == nil {
 		os.Setenv("DD_DOGSTATSD_PORT", strconv.Itoa(port))
 	}
+	config.Load()
 	os.Exit(m.Run())
 }
 

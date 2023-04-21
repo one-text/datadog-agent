@@ -31,6 +31,7 @@ func TestMain(m *testing.M) {
 	// setting the hostname cache saves about 1s when starting the metric agent
 	cacheKey := cache.BuildAgentKey("hostname")
 	cache.Cache.Set(cacheKey, hostname.Data{}, cache.NoExpiration)
+	config.Load()
 	os.Exit(m.Run())
 }
 
