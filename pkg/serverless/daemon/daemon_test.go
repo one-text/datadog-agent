@@ -18,6 +18,7 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/serverless/random"
 	"github.com/DataDog/datadog-agent/pkg/serverless/trace"
+	"github.com/DataDog/datadog-agent/pkg/trace/pb"
 	"github.com/DataDog/datadog-agent/pkg/trace/testutil"
 )
 
@@ -164,7 +165,7 @@ func TestSetTraceTagOk(t *testing.T) {
 	}
 	var agent = &trace.ServerlessTraceAgent{}
 	t.Setenv("DD_API_KEY", "x")
-	agent.Start(true, &trace.LoadConfig{Path: "/does-not-exist.yml"}, random.Random.Uint64())
+	agent.Start(true, &trace.LoadConfig{Path: "/does-not-exist.yml"}, make(chan *pb.Span), random.Random.Uint64())
 	defer agent.Stop()
 	d := Daemon{
 		TraceAgent: agent,

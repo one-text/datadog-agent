@@ -35,19 +35,13 @@ var functionName = os.Getenv(functionNameEnvVar)
 type ColdStartSpanCreator struct {
 	TraceAgent            *ServerlessTraceAgent
 	createSpan            sync.Once
-	LambdaSpanChan        chan *pb.Span
+	LambdaSpanChan        <-chan *pb.Span
 	InitDurationChan      <-chan float64
 	syncSpanDurationMutex sync.Mutex
 	ColdStartSpanId       uint64
 	lambdaSpan            *pb.Span
 	initDuration          float64
 	StopChan              chan struct{}
-}
-
-func (c *ColdStartSpanCreator) Filter(span pb.Span) {
-	if span.Service == "aws.lambda" {
-		c.LambdaSpanChan <- &span
-	}
 }
 
 func (c *ColdStartSpanCreator) Run() {

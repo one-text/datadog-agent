@@ -20,25 +20,24 @@ import (
 	coreOtlp "github.com/DataDog/datadog-agent/pkg/otlp"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
 	"github.com/DataDog/datadog-agent/pkg/serverless/executioncontext"
-	"github.com/DataDog/datadog-agent/pkg/serverless/random"
 	"github.com/DataDog/datadog-agent/pkg/trace/api"
 	"github.com/DataDog/datadog-agent/pkg/trace/info"
 	"github.com/DataDog/datadog-agent/pkg/trace/pb"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
-const functionNameEnvVar = "AWS_LAMBDA_FUNCTION_NAME"
-
 // ServerlessOTLPAgent represents an OTLP agent in a serverless context
 type ServerlessOTLPAgent struct {
-	pipeline         *coreOtlp.Pipeline
+	pipeline *coreOtlp.Pipeline
+
+	// TODO
 	executionContext *executioncontext.ExecutionContext
 	ProcessTrace     func(p *api.Payload)
 }
 
 // NewServerlessOTLPAgent creates a new ServerlessOTLPAgent with the correct
 // otel pipeline.
-func NewServerlessOTLPAgent(executionContext *executioncontext.ExecutionContext, serializer serializer.MetricSerializer) *ServerlessOTLPAgent {
+func NewServerlessOTLPAgent(serializer serializer.MetricSerializer, executionContext *executioncontext.ExecutionContext) *ServerlessOTLPAgent {
 	pipeline, err := coreOtlp.NewPipelineFromAgentConfig(config.Datadog, serializer)
 	if err != nil {
 		log.Error("Error creating new otlp pipeline:", err)
@@ -106,15 +105,17 @@ func (o *ServerlessOTLPAgent) waitForState(state string, timeout time.Duration) 
 	}
 }
 
-func (o *ServerlessOTLPAgent) Filter(span pb.Span) {
+var functionNameEnvVar = os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
+
+func (o *ServerlessOTLPAgent) CreateRootSpan(span pb.Span, spanID uint64) {
 	if span.ParentID == 0 {
 		log.Debug("opentelemetry root span received, creating aws.lambda execution span")
 
 		span.Service = "aws.lambda" // will be replaced by the span processor
 		span.Name = "aws.lambda"
 		span.Type = "serverless"
-		span.Resource = os.Getenv(functionNameEnvVar)
-		span.SpanID = random.GenerateTraceId()
+		span.Resource = functionNameEnvVar
+		span.SpanID = spanID
 		span.Meta = map[string]string{
 			"_dd.origin": "lambda",
 			"request_id": span.Meta["faas.execution"],

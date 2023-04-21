@@ -221,7 +221,7 @@ func (lp *LifecycleProcessor) OnInvokeEnd(endDetails *InvocationEndDetails) {
 		if !lp.OTLPEnabled {
 			endExecutionSpan(lp.GetExecutionInfo(), lp.requestHandler.triggerTags, lp.requestHandler.triggerMetrics, lp.ProcessTrace, endDetails)
 		} else {
-			log.Debug("skipping aws.lambda span creation for universal instrumentation")
+			log.Debug("skipping aws.lambda span creation in OnInvokeEnd for otlp enabled extension")
 		}
 
 		if lp.InferredSpansEnabled {

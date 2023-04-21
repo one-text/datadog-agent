@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/DataDog/datadog-agent/pkg/serverless/invocationlifecycle"
+	"github.com/DataDog/datadog-agent/pkg/serverless/otlp"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
@@ -25,6 +26,9 @@ type Hello struct {
 func (h *Hello) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Debug("Hit on the serverless.Hello route.")
 	h.daemon.LambdaLibraryDetected = true
+	if otlp.IsEnabled() {
+		log.Warn("Misconfiguration: DD tracing layer detected with OTLP enabled! Please remove.")
+	}
 }
 
 // Flush is a route called by the Datadog Lambda Library when the runtime is done handling an invocation.

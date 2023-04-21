@@ -17,12 +17,8 @@ const (
 
 type spanModifier struct {
 	tags            map[string]string
+	lambdaSpanChan  chan<- *pb.Span
 	coldStartSpanId uint64
-	filters         []SpanFilter
-}
-
-type SpanFilter interface {
-	Filter(pb.Span)
 }
 
 // ModifySpan applies extra logic to the given span
@@ -31,6 +27,9 @@ func (s *spanModifier) ModifySpan(_ *pb.TraceChunk, span *pb.Span) {
 		// service name could be incorrectly set to 'aws.lambda' in datadog lambda libraries
 		if s.tags["service"] != "" {
 			span.Service = s.tags["service"]
+		}
+		if s.lambdaSpanChan != nil && span.Name != "aws.lambda.cold_start" {
+			s.lambdaSpanChan <- span
 		}
 	}
 
@@ -47,11 +46,5 @@ func (s *spanModifier) ModifySpan(_ *pb.TraceChunk, span *pb.Span) {
 			spanMetadataTags = inferredspan.FilterFunctionTags(spanMetadataTags)
 			span.Meta = spanMetadataTags
 		}
-	}
-
-	for _, filter := range s.filters {
-		// pass the actual span rather than its pointer to enforce the
-		// requirement that filters do not modify spans
-		filter.Filter(*span)
 	}
 }

@@ -71,7 +71,7 @@ func (l *LoadConfig) Load() (*config.AgentConfig, error) {
 }
 
 // Start starts the agent
-func (s *ServerlessTraceAgent) Start(enabled bool, loadConfig Load, coldStartSpanId uint64, filters ...SpanFilter) {
+func (s *ServerlessTraceAgent) Start(enabled bool, loadConfig Load, lambdaSpanChan chan<- *pb.Span, coldStartSpanId uint64) {
 	if enabled {
 		// Set the serverless config option which will be used to determine if
 		// hostname should be resolved. Skipping hostname resolution saves >1s
@@ -88,7 +88,7 @@ func (s *ServerlessTraceAgent) Start(enabled bool, loadConfig Load, coldStartSpa
 			s.ta = agent.NewAgent(context, tc, telemetry.NewNoopCollector())
 			s.spanModifier = &spanModifier{
 				coldStartSpanId: coldStartSpanId,
-				filters:         filters,
+				lambdaSpanChan:  lambdaSpanChan,
 			}
 
 			s.ta.ModifySpan = s.spanModifier.ModifySpan
