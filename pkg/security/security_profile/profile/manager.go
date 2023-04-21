@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/DataDog/datadog-go/v5/statsd"
 	manager "github.com/DataDog/ebpf-manager"
@@ -26,6 +27,7 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/rconfig"
 	"github.com/DataDog/datadog-agent/pkg/security/resolvers/cgroup"
 	cgroupModel "github.com/DataDog/datadog-agent/pkg/security/resolvers/cgroup/model"
+	timeResolver "github.com/DataDog/datadog-agent/pkg/security/resolvers/time"
 	"github.com/DataDog/datadog-agent/pkg/security/secl/model"
 	"github.com/DataDog/datadog-agent/pkg/security/seclog"
 	"github.com/DataDog/datadog-agent/pkg/security/utils"
@@ -64,6 +66,7 @@ type SecurityProfileManager struct {
 	config         *config.Config
 	statsdClient   statsd.ClientInterface
 	cgroupResolver *cgroup.Resolver
+	timeResolver   *timeResolver.Resolver
 	providers      []Provider
 
 	manager                    *manager.Manager
@@ -82,7 +85,7 @@ type SecurityProfileManager struct {
 }
 
 // NewSecurityProfileManager returns a new instance of SecurityProfileManager
-func NewSecurityProfileManager(config *config.Config, statsdClient statsd.ClientInterface, cgroupResolver *cgroup.Resolver, manager *manager.Manager) (*SecurityProfileManager, error) {
+func NewSecurityProfileManager(config *config.Config, statsdClient statsd.ClientInterface, cgroupResolver *cgroup.Resolver, timeResolver *timeResolver.Resolver, manager *manager.Manager) (*SecurityProfileManager, error) {
 	var providers []Provider
 
 	// instantiate directory provider
@@ -126,6 +129,7 @@ func NewSecurityProfileManager(config *config.Config, statsdClient statsd.Client
 		securityProfileMap:         securityProfileMap,
 		securityProfileSyscallsMap: securityProfileSyscallsMap,
 		cgroupResolver:             cgroupResolver,
+		timeResolver:               timeResolver,
 		profiles:                   make(map[cgroupModel.WorkloadSelector]*SecurityProfile),
 		pendingCache:               profileCache,
 		cacheHit:                   atomic.NewUint64(0),
@@ -389,6 +393,10 @@ func (m *SecurityProfileManager) OnNewProfileEvent(selector cgroupModel.Workload
 
 	// decode the content of the profile
 	protoToSecurityProfile(profile, newProfile)
+	if profile.autolearnEnabled {
+		// reset the last anomaly timestamp to now
+		profile.lastAnomalyNano = uint64(m.timeResolver.ComputeMonotonicTimestamp(time.Now()))
+	}
 
 	// prepare the profile for insertion
 	m.prepareProfile(profile)
@@ -548,6 +556,35 @@ func (m *SecurityProfileManager) LookupEventInProfiles(event *model.Event) {
 	}
 
 	FillProfileContextFromProfile(&event.SecurityProfileContext, profile)
+
+	// check if the event should be injected in the profile automatically
+	if profile.autolearnEnabled {
+		if profile.lastAnomalyNano == 0 {
+			profile.lastAnomalyNano = event.TimestampRaw
+		}
+		if time.Duration(event.TimestampRaw-profile.lastAnomalyNano) >= m.config.RuntimeSecurity.AnomalyDetectionMinimumStableDelayBeforeAnomalyDetection {
+			profile.autolearnEnabled = false
+		} else {
+			newEntry, err := profile.ActivityTree.Insert(event)
+			if err != nil {
+				// ignore, insertion failed
+				m.eventFiltering[event.GetEventType()][NoProfile].Inc()
+				return
+			}
+
+			// the event was either already in the profile, or has just been inserted
+			event.AddToFlags(model.EventFlagsSecurityProfileInProfile)
+
+			if newEntry {
+				profile.lastAnomalyNano = event.TimestampRaw
+				m.eventFiltering[event.GetEventType()][NotInProfile].Inc()
+			} else {
+				m.eventFiltering[event.GetEventType()][InProfile].Inc()
+			}
+
+			return
+		}
+	}
 
 	// check if the event is in its profile
 	ok, err := profile.ActivityTree.Contains(event)
