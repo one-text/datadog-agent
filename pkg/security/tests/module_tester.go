@@ -1907,7 +1907,7 @@ func (tm *testModule) findNextPartialDump(dockerInstance *dockerCmdWrapper, id *
 
 //nolint:deadcode,unused
 func searchForOpen(ad *dump.ActivityDump) bool {
-	for _, node := range ad.ProcessActivityTree {
+	for _, node := range ad.ActivityTree.ProcessNodes {
 		if len(node.Files) > 0 {
 			return true
 		}
@@ -1917,7 +1917,7 @@ func searchForOpen(ad *dump.ActivityDump) bool {
 
 //nolint:deadcode,unused
 func searchForDns(ad *dump.ActivityDump) bool {
-	for _, node := range ad.ProcessActivityTree {
+	for _, node := range ad.ActivityTree.ProcessNodes {
 		if len(node.DNSNames) > 0 {
 			return true
 		}
@@ -1927,7 +1927,7 @@ func searchForDns(ad *dump.ActivityDump) bool {
 
 //nolint:deadcode,unused
 func searchForBind(ad *dump.ActivityDump) bool {
-	for _, node := range ad.ProcessActivityTree {
+	for _, node := range ad.ActivityTree.ProcessNodes {
 		if len(node.Sockets) > 0 {
 			return true
 		}
@@ -1937,7 +1937,7 @@ func searchForBind(ad *dump.ActivityDump) bool {
 
 //nolint:deadcode,unused
 func searchForSyscalls(ad *dump.ActivityDump) bool {
-	for _, node := range ad.ProcessActivityTree {
+	for _, node := range ad.ActivityTree.ProcessNodes {
 		if len(node.Syscalls) > 0 {
 			return true
 		}
@@ -1977,7 +1977,7 @@ func (tm *testModule) findNumberOfExistingDirectoryFiles(id *activityDumpIdentif
 	lastDir := filepath.Base(testDir)
 
 firstLoop:
-	for _, node := range ad.ProcessActivityTree {
+	for _, node := range ad.ActivityTree.ProcessNodes {
 		current := node.Files
 		for _, part := range tempPathParts {
 			if part == "" {
